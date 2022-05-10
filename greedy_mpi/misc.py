@@ -133,5 +133,16 @@ def IMGS(RB, next_vec, iter):
         norm_current = np.sqrt(np.vdot(next_vec, next_vec))
         next_vec /= norm_current
 
-    RB[iter] = next_vec  # np.vstack((RB, next_vec))
-    return RB[iter]
+    # RB[iter] = next_vec  # np.vstack((RB, next_vec))
+    # return RB[iter]
+    return next_vec
+
+def get_highest_error(error_list):
+    rank, idx, err = -np.inf, -np.inf, -np.inf
+    for rank_id, rank_errors in enumerate(error_list):
+        max_rank_err = max(rank_errors)
+        if max_rank_err > err:
+            err = max_rank_err
+            idx = rank_errors.index(err)
+            rank = rank_id
+    return rank, idx, err
