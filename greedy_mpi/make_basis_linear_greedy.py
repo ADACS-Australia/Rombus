@@ -50,7 +50,7 @@ def IMGS(RB, next_vec, iter):
 
 fmin = 20
 fmax = 4096 
-deltaF = 1./256.
+deltaF = 1./4.
 fseries = np.linspace(fmin, fmax, int((fmax-fmin)/deltaF)+1)
 fmin_index = int(fmin/deltaF)
 
