@@ -27,6 +27,9 @@ setup(
         "isort",
         "scipy",
         "pytest",
+        "lalsuite",
+        "mpi4py",
+        "tqdm"
     ],
     keywords=["reduced order modeling"],
     classifiers=[
