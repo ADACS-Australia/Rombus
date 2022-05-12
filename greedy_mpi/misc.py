@@ -130,4 +130,4 @@ def get_highest_error(error_list):
             err = max_rank_err
             idx = rank_errors.index(err)
             rank = rank_id
-    return rank, idx, err
+    return rank, idx, np.float64(err.real)
