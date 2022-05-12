@@ -9,7 +9,7 @@ def dot_product(weights, a, b):
 def project_onto_basis(integration_weights, e, h, iter):
 
 	#c = np.einsum('i,ji->j', integration_weights*e[iter].conjugate(), h)
-	pc = np.zeros(len(h))
+	pc = np.zeros(len(h), dtype=complex)
         #projections += np.outer(c,e[iter])
 	for j in range(len(h)):
 		pc[j] = dot_product(integration_weights, e[iter], h[j])
