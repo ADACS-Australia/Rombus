@@ -6,10 +6,10 @@ def dot_product(weights, a, b):
 	return np.vdot(a*weights, b)
 
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-def project_onto_basis(integration_weights, e, h, iter):
+def project_onto_basis(integration_weights, e, h, iter, dtype):
 
 	#c = np.einsum('i,ji->j', integration_weights*e[iter].conjugate(), h)
-	pc = np.zeros(len(h), dtype=complex)
+	pc = np.zeros(len(h), dtype=dtype)
         #projections += np.outer(c,e[iter])
 	for j in range(len(h)):
 		pc[j] = dot_product(integration_weights, e[iter], h[j])
@@ -117,7 +117,6 @@ def IMGS(RB, next_vec, iter):
             flag = True
         norm_current = np.sqrt(np.vdot(next_vec, next_vec))
         next_vec /= norm_current
-
     # RB[iter] = next_vec  # np.vstack((RB, next_vec))
     # return RB[iter]
     return next_vec
