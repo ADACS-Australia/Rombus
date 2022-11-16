@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "rombus"
+version = "0.0.0-dev"
+description = "Reduced order modeling for the masses"
+authors = [
+            "J. Hu <jitinghu@swin.edu.au>", 
+            "Gregory Poole <gbpoole@gmail.com>"
+            ]
+license = "MIT-expat"
+
+readme = "README.md"
+
+packages = [
+    { include = "rombus", from = "python" }
+]
+
+homepage = "https://github.com/ADACS-Australia/rombus"
+documentation = "https://rombus.readthedocs.io/en/latest/"
+
+[tool.poetry.dependencies]
+python = " >=3.11"
+Sphinx = { version = "4.2.0", optional = true }
+sphinx-rtd-theme = { version = "1.0.0", optional = true }
+myst-parser = { version = "^0.18.0", optional = true }
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.0"
+
+[tool.poetry.extras]
+docs = ["Sphinx", "sphinx-rtd-theme", "myst-parser"]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
