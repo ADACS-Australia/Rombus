@@ -3,7 +3,7 @@ name = "rombus"
 version = "0.0.0-dev"
 description = "Reduced order modeling for the masses"
 authors = [
-            "Gregory Poole <gbpoole@gmail.com>"
+            "Gregory Poole <gbpoole@gmail.com>",
             "J. Hu <jitinghu@swin.edu.au>", 
             ]
 license = "MIT-expat"
