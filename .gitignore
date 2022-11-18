@@ -24,7 +24,6 @@ __pycache__
 
 # Poetry stuff
 dist
-poetry.lock
 
 # JetBrains stuff
 .idea
