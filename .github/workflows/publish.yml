@@ -29,6 +29,12 @@ jobs:
         virtualenvs-in-project: true
         installer-parallel: true
 
+    - name: Check venv
+      run: |
+        echo "${VENV}="${VENV}
+        echo "ls ${HOME}:"
+        ls ${HOME}
+
     - name: Load cached venv
       id: cached-poetry-dependencies
       uses: actions/cache@v3
