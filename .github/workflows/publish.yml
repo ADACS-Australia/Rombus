@@ -32,6 +32,7 @@ jobs:
     - name: Check venv
       run: |
         echo "${VENV}="${VENV}
+        echo "${HOME}:"${HOME}
         echo "ls ${HOME}:"
         ls ${HOME}
 
