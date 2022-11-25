@@ -29,23 +29,17 @@ jobs:
         virtualenvs-in-project: true
         installer-parallel: true
 
-    - name: Check venv
-      run: |
-        echo "${VENV}="${VENV}
-        echo "${HOME}:"${HOME}
-        echo "ls ${HOME}:"
-        ls ${HOME}
-
     - name: Load cached venv
       id: cached-poetry-dependencies
       uses: actions/cache@v3
       with:
-        path: .venv
+        path: ${VENV}/../.. 
         key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
 
     - name: Install dependencies
       if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
       run: |
+        source ${VENV}
         poetry install --no-interaction --no-root
         poetry install --no-interaction --no-root --extras docs
 
@@ -60,12 +54,12 @@ jobs:
 
     - name: Code tests
       run: |
-        source .venv/bin/activate
+        source ${VENV}
         pytest 
 
     - name: Documentation build test
       run: |
-        source .venv/bin/activate
+        source ${VENV}
         make html
 
     - name: Trigger RTDs build
