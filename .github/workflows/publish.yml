@@ -29,19 +29,17 @@ jobs:
         virtualenvs-in-project: true
         installer-parallel: true
 
-    - name: Install dependencies
+    - name: Set project version
       run: |
-        poetry install --no-interaction --no-root
-        poetry install --no-interaction --no-root --extras docs
+        poetry version $(git describe --tags --abbrev=0)
+
+    - name: Install the project
+      run: |
+        poetry install --no-interaction --extras docs
 
     - name: Generate build
       run: |
-        poetry version $(git describe --tags --abbrev=0)
         poetry build
-
-    - name: Install library
-      run: |
-        poetry install --no-interaction
 
     - name: Code tests
       run: |
