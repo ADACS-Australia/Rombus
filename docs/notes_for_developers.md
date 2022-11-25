@@ -57,6 +57,10 @@ A local copy of the code can be configured as follows:
 
 Configure your *GitHub* repository following the directions [here](https://docs.readthedocs.io/en/stable/integrations.html#github).
 
+You will also need to configure the following 'secrets' for the repository: PYPI_TOKEN, RTD_WEBHOOK_TOKEN and RTD_WEBHOOK_URL_ROMBUS
+
+This can be done by navigating to `Settings->Secrets->Actions`.  These need to be generated through the respective services.
+
 ### *Read the Docs*
 
 Navigate to your RTD Project page and "Import a Project".  Your GitHub project with its new

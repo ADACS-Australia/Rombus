@@ -53,7 +53,7 @@ jobs:
       run: |
         curl -X POST                                                    \
              -H "Authorization: Token ${{ secrets.RTD_WEBHOOK_TOKEN }}" \
-             ${{ secrets.RTD_WEBHOOK_URL_DFISHER_2022A }}
+             ${{ secrets.RTD_WEBHOOK_URL_ROMBUS }}
 
     - name: Publish to PyPI
       run: |
