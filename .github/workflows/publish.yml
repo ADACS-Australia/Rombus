@@ -45,11 +45,11 @@ jobs:
 
     - name: Code tests
       run: |
-        pytest 
+        poetry run pytest 
 
     - name: Documentation build test
       run: |
-        poetry make html
+        poetry run make html
 
     - name: Trigger RTDs build
       run: |
