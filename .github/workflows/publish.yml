@@ -45,7 +45,7 @@ jobs:
 
     - name: Code tests
       run: |
-        poetry pytest 
+        pytest 
 
     - name: Documentation build test
       run: |
