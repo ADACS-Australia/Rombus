@@ -11,7 +11,7 @@ from .training import TrainingTools
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 def rate_to_num(a, b, rate):
     """Convert sample rate to sample numbers in [a,b]"""
-    return np.floor(np.float(b - a) * rate) + 1
+    return np.floor(float(b - a) * rate) + 1
 
 
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

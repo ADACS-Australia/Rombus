@@ -1,4 +1,4 @@
-from greedy_mpi import rompy
+from rombus import rompy
 
 def test_rate_to_num():
     x = rompy.integrals.rate_to_num(0,10,50)
