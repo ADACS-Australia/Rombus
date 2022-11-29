@@ -1,4 +1,4 @@
-from greedy_mpi import misc
+from rombus import misc
 
 def test_highest_error():
     err_list = [[0,0,1], [0,2], [100,0]]
