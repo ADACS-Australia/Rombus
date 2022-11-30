@@ -5,7 +5,7 @@
 SPHINXOPTS    =
 SPHINXBUILD   = sphinx-build
 SOURCEDIR     = docs
-BUILDDIR      = build
+BUILDDIR      = docs/_build
 
 # Set some variables needed by the documentation
 # TODO: Ideally, PKG_PROJECT would be extracted from the TOML file correctly.  This will be easier with Python 3.11, which will include tomllib automatically
