@@ -1,5 +1,5 @@
 import sys
-from greedy_mpi.rompy import *
+from rombus.rompy import *
 import numpy as np
 
 
