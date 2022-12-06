@@ -1,5 +1,5 @@
 import sys
-from rombus.rompy import *
+from rombus import *
 import numpy as np
 
 
