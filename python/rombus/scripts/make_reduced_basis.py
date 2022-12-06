@@ -6,8 +6,7 @@ mpirun -n 3 python make_reduced_basis.py
 
 import numpy as np
 import lalsimulation
-from greedy_mpi.misc import *
-from greedy_mpi.filepaths import GREEDY_POINTS
+from rombus.misc import *
 import lal
 import sys
 from mpi4py import MPI
@@ -195,7 +194,7 @@ def plot_basis(rb_matrix):
     fig.savefig("basis.png")
 
 
-def main():
+def main(GREEDY_POINTS):
     greedypoints, chunk_counts = divide_and_send_data_to_ranks(GREEDY_POINTS)
     my_ts = generate_training_set(greedypoints)
     RB_matrix = init_basis_matrix(my_ts[0])  # hardcoding 1st waveform to be used to start the basis
@@ -233,4 +232,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    GREEDY_POINTS = sys.argv[1]
+    main(GREEDY_POINTS)
