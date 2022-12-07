@@ -8,12 +8,14 @@ import click
 import numpy as np
 import lalsimulation
 from rombus.misc import *
+import rombus as rb
 import lal
 import sys
 from mpi4py import MPI
 from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 from typing import List, Tuple, Dict
+import pylab as plt
 
 MAIN_RANK = 0
 
@@ -195,13 +197,28 @@ def plot_basis(rb_matrix):
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
-@click.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('filename_in', type=click.Path(exists=True))
-def cli(filename_in):
+@click.group()
+@click.pass_context
+def cli(ctx):
     """Perform greedy algorythm operations with Rombus
+
+    """
+
+    # ensure that ctx.obj exists and is a dict (in case `cli()` is called
+    # by means other than the `if` block below)
+    ctx.ensure_object(dict)
+
+@cli.command(context_settings=CONTEXT_SETTINGS)
+@click.argument('filename_in', type=click.Path(exists=True))
+@click.pass_context
+def make_reduced_basis(ctx,filename_in):
+    """Make reduced basis
 
     FILENAME_IN is the 'greedy points' numpy file to take as input
     """
+
+    #filename_in = ctx.obj['filename_in']
+
     greedypoints, chunk_counts = divide_and_send_data_to_ranks(filename_in)
     my_ts = generate_training_set(greedypoints)
     RB_matrix = init_basis_matrix(my_ts[0])  # hardcoding 1st waveform to be used to start the basis
@@ -238,7 +255,134 @@ def cli(filename_in):
         plot_basis(RB_matrix)
 
 
-if __name__ == "__main__":
-    filename_in = sys.argv[1]
-    cli(filename_in)
+@cli.command(context_settings=CONTEXT_SETTINGS)
+@click.pass_context
+def make_empirical_interpolant(ctx):
+    """Make empirical interpolant
+    """
+
+    RB = np.load("RB_matrix.npy")
+    
+    RB = RB[0:len(RB)]
+    eim = rb.algorithms.StandardEIM(RB.shape[0], RB.shape[1])
+    
+    eim.make(RB)
+    
+    fseries = np.linspace(20, 4096, (4096-20)*4 +1)
+    
+    fnodes = fseries[eim.indices]
+    
+    fnodes, B = zip(*sorted(zip(fnodes, eim.B)))
+    
+    np.save("B_matrix", B)
+    np.save("fnodes", fnodes)
+
+
+def signal_at_nodes(fnodes, m1, m2, chi1L, chi2L, chip, thetaJ, alpha):
+
+        l1 = 0  # params[7]
+        l2 = 0  # params[8]
+
+        m1 *= lal.lal.MSUN_SI
+
+        m2 *= lal.lal.MSUN_SI
+
+        WFdict = lal.CreateDict()
+
+        h = lalsimulation.SimIMRPhenomPFrequencySequence(
+            fnodes,
+            chi1L,
+            chi2L,
+            chip,
+            thetaJ,
+            m1,
+            m2,
+            1e6 * lal.lal.PC_SI * 100,
+            alpha,
+            0,
+            40,
+            lalsimulation.IMRPhenomPv2NRTidal_V,
+            lalsimulation.NRTidalv2_V,
+            WFdict,
+        )
+
+        return h[0].data.data
+
+def ROM(fnodes, basis, m1, m2, chi1L, chi2L, chip, thetaJ, alpha):
+	_signal_at_nodes = signal_at_nodes(fnodes, m1, m2, chi1L, chi2L, chip, thetaJ, alpha)
+	return np.dot(_signal_at_nodes, basis)
+
+def full_model(fmin, fmax, deltaF, m1, m2, chi1L, chi2L, chip, thetaJ, alpha):
+
+	WFdict = lal.CreateDict()
+
+	m1 *= lal.lal.MSUN_SI
+	m2 *= lal.lal.MSUN_SI
+
+	h = lalsimulation.SimIMRPhenomP(
+            chi1L,
+            chi2L,
+            chip,
+            thetaJ,
+            m1,
+            m2,
+            1e6 * lal.lal.PC_SI * 100,
+            alpha,
+            0,
+            deltaF,
+            fmin,
+            fmax,
+            40,
+            lalsimulation.IMRPhenomPv2NRTidal_V,
+            lalsimulation.NRTidalv2_V,
+            WFdict,
+        )
+	hplus = h[0].data.data[int(fmin/deltaF):int(fmax/deltaF)+1]
+	return hplus 
+
+@cli.command(context_settings=CONTEXT_SETTINGS)
+@click.argument('filename_in', type=click.Path(exists=True))
+@click.pass_context
+def compare_rom_to_true(ctx, filename_in):
+    """Compare computed ROM to input model
+
+    FILENAME_IN is the 'greedy points' numpy file to take as input
+    """
+
+    #filename_in = ctx.obj['filename_in']
+
+    basis = np.load("B_matrix.npy")
+    fnodes = np.load("fnodes.npy")
+
+    greedypoints = np.load(filename_in)
+    
+    m_min = 20 
+    m_max = 30
+    
+    
+    m1 = np.random.uniform(low=m_min, high=m_max)
+    m2  = np.random.uniform(low=m_min, high=m_max)
+    chi1L = np.random.uniform(low=0, high=0.8)
+    chi2L  = np.random.uniform(low=0, high=0.8)
+    chip  = np.random.uniform(low=0, high=0.8)
+    thetaJ = np.random.uniform(low=0, high=np.pi)
+    alpha = np.random.uniform(low=0, high=np.pi)
+    
+    fmin = 20
+    fmax = 1024 
+    deltaF = 1./4.
+    fseries = np.linspace(fmin, fmax, int((fmax-fmin)/deltaF)+1)
+    
+    h_rom = ROM(fnodes, basis, m1, m2, chi1L, chi2L, chip, thetaJ, alpha)
+    
+    h_full = full_model(fmin, fmax, deltaF, m1, m2, chi1L, chi2L, chip, thetaJ, alpha)
+    
+    plt.semilogx(fseries, h_rom, label='ROM', alpha=0.5, linestyle='--')
+    plt.semilogx(fseries, h_full, label='Full model', alpha=0.5)
+    plt.scatter(fnodes, signal_at_nodes(fnodes, m1, m2, chi1L, chi2L, chip, thetaJ, alpha), s=1)
+    plt.legend()
+    plt.savefig("comparison.pdf", bbox_inches='tight')
+
+if __name__ == '__main__':
+    cli(obj={})
     sys.exit()
