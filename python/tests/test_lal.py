@@ -10,7 +10,7 @@ def test_lal(tmp_path):
 
     runner = CliRunner()    
     with runner.isolated_filesystem(temp_dir=tmp_path):
-        result = runner.invoke(cli,["make-reduced-basis", "/Users/gpoole/my_code/rombus/python/tests/data/GreedyPoints.npy"])
+        result = runner.invoke(cli,["make-reduced-basis", "/Users/gpoole/my_code/rombus/python/tests/data/LALSuite_test_grid.npy"])
         assert result.exit_code == 0
         result = runner.invoke(cli,["make-empirical-interpolant"])
         assert result.exit_code == 0
