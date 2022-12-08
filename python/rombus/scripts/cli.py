@@ -33,9 +33,7 @@ def generate_training_set(greedypoints: List[np.array]) -> List[np.array]:
 
     my_ts = np.zeros(shape=(len(greedypoints), len(fseries)), dtype="complex")
 
-    for ii, params in enumerate(
-            tqdm(greedypoints, desc=f"Generating training set for rank {RANK}")
-    ):
+    for ii, params in enumerate(tqdm(greedypoints, desc=f"Generating training set for rank {RANK}")):
 
         m1 = params[0]
         m2 = params[1]
@@ -56,7 +54,6 @@ def generate_training_set(greedypoints: List[np.array]) -> List[np.array]:
         lalsimulation.SimInspiralWaveformParamsInsertTidalLambda1(WFdict, l1)
         lalsimulation.SimInspiralWaveformParamsInsertTidalLambda2(WFdict, l2)
 
-        # hp = lalsimulation.SimIMRPhenomDNRTidal(0, deltaF, fmin, fmax, 40, 1e6*lal.lal.PC_SI*100, m1, m2, chi1L, chi2L, l1, l2, None)
         h = lalsimulation.SimIMRPhenomP(
             chi1L,
             chi2L,
@@ -132,9 +129,7 @@ def add_next_waveform_to_basis(RB_matrix, pc_matrix, my_ts, iter):
         err_rank, err_idx, error = error_data
     else:
         error_data = None, None, None
-    error_data = COMM.bcast(
-        error_data, root=MAIN_RANK
-    )  # share the error data with all nodes
+    error_data = COMM.bcast( error_data, root=MAIN_RANK)  # share the error data with all nodes
     err_rank, err_idx, error = error_data
 
     # get waveform with the worst error
@@ -341,25 +336,19 @@ def full_model(fmin, fmax, deltaF, m1, m2, chi1L, chi2L, chip, thetaJ, alpha):
 	return hplus 
 
 @cli.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('filename_in', type=click.Path(exists=True))
 @click.pass_context
-def compare_rom_to_true(ctx, filename_in):
+def compare_rom_to_true(ctx):
     """Compare computed ROM to input model
 
     FILENAME_IN is the 'greedy points' numpy file to take as input
     """
 
-    #filename_in = ctx.obj['filename_in']
-
     basis = np.load("B_matrix.npy")
     fnodes = np.load("fnodes.npy")
 
-    greedypoints = np.load(filename_in)
-    
-    m_min = 20 
+    m_min = 20
     m_max = 30
-    
-    
+
     m1 = np.random.uniform(low=m_min, high=m_max)
     m2  = np.random.uniform(low=m_min, high=m_max)
     chi1L = np.random.uniform(low=0, high=0.8)
@@ -367,16 +356,17 @@ def compare_rom_to_true(ctx, filename_in):
     chip  = np.random.uniform(low=0, high=0.8)
     thetaJ = np.random.uniform(low=0, high=np.pi)
     alpha = np.random.uniform(low=0, high=np.pi)
-    
+
     fmin = 20
-    fmax = 1024 
+    fmax = 1024
     deltaF = 1./4.
     fseries = np.linspace(fmin, fmax, int((fmax-fmin)/deltaF)+1)
-    
+
     h_rom = ROM(fnodes, basis, m1, m2, chi1L, chi2L, chip, thetaJ, alpha)
-    
     h_full = full_model(fmin, fmax, deltaF, m1, m2, chi1L, chi2L, chip, thetaJ, alpha)
-    
+
+    np.save("ROM_diff", np.subtract(h_rom,h_full))
+
     plt.semilogx(fseries, h_rom, label='ROM', alpha=0.5, linestyle='--')
     plt.semilogx(fseries, h_full, label='Full model', alpha=0.5)
     plt.scatter(fnodes, signal_at_nodes(fnodes, m1, m2, chi1L, chi2L, chip, thetaJ, alpha), s=1)
