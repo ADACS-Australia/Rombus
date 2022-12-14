@@ -16,6 +16,8 @@ from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 from typing import List, Tuple, Dict
 import pylab as plt
+from dataclasses import dataclass, field
+from typing import Dict, Protocol
 
 MAIN_RANK = 0
 
@@ -23,37 +25,81 @@ COMM = MPI.COMM_WORLD
 SIZE = COMM.Get_size()
 RANK = COMM.Get_rank()
 
-def generate_training_set(greedypoints: List[np.array]) -> List[np.array]:
-    """returns a list of waveforms (one for each row in 'greedypoints')"""
+class IsDataclass(Protocol):
+    # Checking for this attribute is currently the most reliable way to 
+    # ascertain that something is a dataclass
+    __dataclass_fields__: Dict
+
+############ START OF DOMAIN-SPECIFIC CODE ############ 
+
+model_dtype = 'complex'
+
+def init_cache():
+    @dataclass
+    class ModelCache(object):
+        fmin: float
+        fmax: float
+        deltaF: float
+        nf: int
+        fseries: np.ndarray
+        fmin_index: float
+        WFdict: Dict
     fmin = 20
     fmax = 1024
     deltaF = 1.0 / 4.0
-    fseries = np.linspace(fmin, fmax, int((fmax - fmin) / deltaF) + 1)
+    nf = int((fmax-fmin)/deltaF)+1
+    fseries = np.linspace(fmin, fmax, nf)
     fmin_index = int(fmin / deltaF)
+    WFdict = lal.CreateDict()
+    return ModelCache(
+        fmin = fmin,
+        fmax = fmax,
+        deltaF = deltaF,
+        nf = nf,
+        fseries = fseries,
+        fmin_index = fmin_index,
+        WFdict = WFdict
+        )
 
-    my_ts = np.zeros(shape=(len(greedypoints), len(fseries)), dtype="complex")
+def init_domain(cache):
+    return cache.fseries
 
-    for ii, params in enumerate(tqdm(greedypoints, desc=f"Generating training set for rank {RANK}")):
+def compute_model(params: np.array, domain, cache: IsDataclass) -> np.array:
+    m1 = params[0]
+    m2 = params[1]
+    chi1L = params[2]
+    chi2L = params[3]
+    chip = params[4]
+    thetaJ = params[5]
+    alpha = params[6]
+    l1 =0
+    l2 =0
 
-        m1 = params[0]
-        m2 = params[1]
-        chi1L = params[2]
-        chi2L = params[3]
-        chip = params[4]
-        thetaJ = params[5]
-        alpha = params[6]
-        l1 = 0  # params[7]
-        l2 = 0  # params[8]
+    m1 *= lal.lal.MSUN_SI
+    m2 *= lal.lal.MSUN_SI
 
-        m1 *= lal.lal.MSUN_SI
+    lalsimulation.SimInspiralWaveformParamsInsertTidalLambda1(cache.WFdict, l1)
+    lalsimulation.SimInspiralWaveformParamsInsertTidalLambda2(cache.WFdict, l2)
 
-        m2 *= lal.lal.MSUN_SI
-
-        WFdict = lal.CreateDict()
-
-        lalsimulation.SimInspiralWaveformParamsInsertTidalLambda1(WFdict, l1)
-        lalsimulation.SimInspiralWaveformParamsInsertTidalLambda2(WFdict, l2)
-
+    if not np.array_equiv(domain,cache.fseries):
+        h = lalsimulation.SimIMRPhenomPFrequencySequence(
+            domain,
+            chi1L,
+            chi2L,
+            chip,
+            thetaJ,
+            m1,
+            m2,
+            1e6 * lal.lal.PC_SI * 100,
+            alpha,
+            0,
+            40,
+            lalsimulation.IMRPhenomPv2NRTidal_V,
+            lalsimulation.NRTidalv2_V,
+            cache.WFdict,
+        )
+        h = h[0].data.data
+    else:
         h = lalsimulation.SimIMRPhenomP(
             chi1L,
             chi2L,
@@ -64,25 +110,35 @@ def generate_training_set(greedypoints: List[np.array]) -> List[np.array]:
             1e6 * lal.lal.PC_SI * 100,
             alpha,
             0,
-            deltaF,
-            fmin,
-            fmax,
+            cache.deltaF,
+            cache.fmin,
+            cache.fmax,
             40,
             lalsimulation.IMRPhenomPv2NRTidal_V,
             lalsimulation.NRTidalv2_V,
-            WFdict,
+            cache.WFdict,
         )
+        h = h[0].data.data[cache.fmin_index: len(h[0].data.data)]
+        if len(h) < cache.nf:
+            h = np.append(h, np.zeros(cache.nf - len(h), dtype=complex))
 
-        h = h[0].data.data[fmin_index: len(h[0].data.data)]
+    return h
 
-        if len(h) < len(fseries):
-            h = np.append(h, np.zeros(len(fseries) - len(h), dtype=complex))
-        h /= np.sqrt(np.vdot(h, h))
+############ END OF DOMAIN-SPECIFIC CODE ############ 
 
-        my_ts[ii] = h
+def generate_training_set(greedypoints: List[np.array]) -> List[np.array]:
+    """returns a list of waveforms (one for each row in 'greedypoints')"""
+
+    cache = init_cache()
+    domain = init_domain(cache)
+
+    my_ts = np.zeros(shape=(len(greedypoints), len(domain)), dtype=model_dtype)
+    for ii, params in enumerate(tqdm(greedypoints, desc=f"Generating training set for rank {RANK}")):
+        h = compute_model(params, domain, cache)
+        my_ts[ii] = h / np.sqrt(np.vdot(h, h))
         # TODO: currently stored in RAM but does this need to be saved/cached on each compute node's scratch space?
-    return my_ts
 
+    return my_ts
 
 def divide_and_send_data_to_ranks(datafile: str) -> Tuple[List[np.array], Dict]:
     # dividing greedypoints into chunks
@@ -190,6 +246,10 @@ def plot_basis(rb_matrix):
     plt.tight_layout()
     fig.savefig("basis.png")
 
+def ROM(params, domain, cache, basis):
+    _signal_at_nodes = compute_model(params, domain, cache)
+    return np.dot(_signal_at_nodes, basis)
+
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 @click.group()
@@ -211,8 +271,6 @@ def make_reduced_basis(ctx,filename_in):
 
     FILENAME_IN is the 'greedy points' numpy file to take as input
     """
-
-    #filename_in = ctx.obj['filename_in']
 
     greedypoints, chunk_counts = divide_and_send_data_to_ranks(filename_in)
     my_ts = generate_training_set(greedypoints)
@@ -263,77 +321,16 @@ def make_empirical_interpolant(ctx):
     
     eim.make(RB)
     
-    fseries = np.linspace(20, 4096, (4096-20)*4 +1)
+    cache = init_cache()
+    domain = init_domain(cache)
     
-    fnodes = fseries[eim.indices]
+    fnodes = domain[eim.indices]
     
     fnodes, B = zip(*sorted(zip(fnodes, eim.B)))
     
     np.save("B_matrix", B)
     np.save("fnodes", fnodes)
 
-
-def signal_at_nodes(fnodes, m1, m2, chi1L, chi2L, chip, thetaJ, alpha):
-
-        l1 = 0  # params[7]
-        l2 = 0  # params[8]
-
-        m1 *= lal.lal.MSUN_SI
-
-        m2 *= lal.lal.MSUN_SI
-
-        WFdict = lal.CreateDict()
-
-        h = lalsimulation.SimIMRPhenomPFrequencySequence(
-            fnodes,
-            chi1L,
-            chi2L,
-            chip,
-            thetaJ,
-            m1,
-            m2,
-            1e6 * lal.lal.PC_SI * 100,
-            alpha,
-            0,
-            40,
-            lalsimulation.IMRPhenomPv2NRTidal_V,
-            lalsimulation.NRTidalv2_V,
-            WFdict,
-        )
-
-        return h[0].data.data
-
-def ROM(fnodes, basis, m1, m2, chi1L, chi2L, chip, thetaJ, alpha):
-	_signal_at_nodes = signal_at_nodes(fnodes, m1, m2, chi1L, chi2L, chip, thetaJ, alpha)
-	return np.dot(_signal_at_nodes, basis)
-
-def full_model(fmin, fmax, deltaF, m1, m2, chi1L, chi2L, chip, thetaJ, alpha):
-
-	WFdict = lal.CreateDict()
-
-	m1 *= lal.lal.MSUN_SI
-	m2 *= lal.lal.MSUN_SI
-
-	h = lalsimulation.SimIMRPhenomP(
-            chi1L,
-            chi2L,
-            chip,
-            thetaJ,
-            m1,
-            m2,
-            1e6 * lal.lal.PC_SI * 100,
-            alpha,
-            0,
-            deltaF,
-            fmin,
-            fmax,
-            40,
-            lalsimulation.IMRPhenomPv2NRTidal_V,
-            lalsimulation.NRTidalv2_V,
-            WFdict,
-        )
-	hplus = h[0].data.data[int(fmin/deltaF):int(fmax/deltaF)+1]
-	return hplus 
 
 @cli.command(context_settings=CONTEXT_SETTINGS)
 @click.pass_context
@@ -357,19 +354,20 @@ def compare_rom_to_true(ctx):
     thetaJ = np.random.uniform(low=0, high=np.pi)
     alpha = np.random.uniform(low=0, high=np.pi)
 
-    fmin = 20
-    fmax = 1024
-    deltaF = 1./4.
-    fseries = np.linspace(fmin, fmax, int((fmax-fmin)/deltaF)+1)
+    params = np.array([m1, m2, chi1L, chi2L, chip, thetaJ, alpha])
 
-    h_rom = ROM(fnodes, basis, m1, m2, chi1L, chi2L, chip, thetaJ, alpha)
-    h_full = full_model(fmin, fmax, deltaF, m1, m2, chi1L, chi2L, chip, thetaJ, alpha)
+    cache = init_cache()
+    domain = init_domain(cache)
+
+    h_full = compute_model(params, domain, cache)
+    h_nodes = compute_model(params, fnodes, cache)
+    h_rom = ROM(params, fnodes, cache, basis)
 
     np.save("ROM_diff", np.subtract(h_rom,h_full))
 
-    plt.semilogx(fseries, h_rom, label='ROM', alpha=0.5, linestyle='--')
-    plt.semilogx(fseries, h_full, label='Full model', alpha=0.5)
-    plt.scatter(fnodes, signal_at_nodes(fnodes, m1, m2, chi1L, chi2L, chip, thetaJ, alpha), s=1)
+    plt.semilogx(domain, h_rom, label='ROM', alpha=0.5, linestyle='--')
+    plt.semilogx(domain, h_full, label='Full model', alpha=0.5)
+    plt.scatter(fnodes, h_nodes, s=1)
     plt.legend()
     plt.savefig("comparison.pdf", bbox_inches='tight')
 
