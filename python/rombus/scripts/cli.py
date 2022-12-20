@@ -18,6 +18,7 @@ from typing import List, Tuple, Dict
 import pylab as plt
 from dataclasses import dataclass, field
 from typing import Dict, Protocol
+from rombus.importer import ImportFromStringError, import_from_string
 
 MAIN_RANK = 0
 
@@ -30,111 +31,18 @@ class IsDataclass(Protocol):
     # ascertain that something is a dataclass
     __dataclass_fields__: Dict
 
-############ START OF DOMAIN-SPECIFIC CODE ############ 
-
-model_dtype = 'complex'
-
-def init_cache():
-    @dataclass
-    class ModelCache(object):
-        fmin: float
-        fmax: float
-        deltaF: float
-        nf: int
-        fseries: np.ndarray
-        fmin_index: float
-        WFdict: Dict
-    fmin = 20
-    fmax = 1024
-    deltaF = 1.0 / 4.0
-    nf = int((fmax-fmin)/deltaF)+1
-    fseries = np.linspace(fmin, fmax, nf)
-    fmin_index = int(fmin / deltaF)
-    WFdict = lal.CreateDict()
-    return ModelCache(
-        fmin = fmin,
-        fmax = fmax,
-        deltaF = deltaF,
-        nf = nf,
-        fseries = fseries,
-        fmin_index = fmin_index,
-        WFdict = WFdict
-        )
-
-def init_domain(cache):
-    return cache.fseries
-
-def compute_model(params: np.array, domain, cache: IsDataclass) -> np.array:
-    m1 = params[0]
-    m2 = params[1]
-    chi1L = params[2]
-    chi2L = params[3]
-    chip = params[4]
-    thetaJ = params[5]
-    alpha = params[6]
-    l1 =0
-    l2 =0
-
-    m1 *= lal.lal.MSUN_SI
-    m2 *= lal.lal.MSUN_SI
-
-    lalsimulation.SimInspiralWaveformParamsInsertTidalLambda1(cache.WFdict, l1)
-    lalsimulation.SimInspiralWaveformParamsInsertTidalLambda2(cache.WFdict, l2)
-
-    if not np.array_equiv(domain,cache.fseries):
-        h = lalsimulation.SimIMRPhenomPFrequencySequence(
-            domain,
-            chi1L,
-            chi2L,
-            chip,
-            thetaJ,
-            m1,
-            m2,
-            1e6 * lal.lal.PC_SI * 100,
-            alpha,
-            0,
-            40,
-            lalsimulation.IMRPhenomPv2NRTidal_V,
-            lalsimulation.NRTidalv2_V,
-            cache.WFdict,
-        )
-        h = h[0].data.data
-    else:
-        h = lalsimulation.SimIMRPhenomP(
-            chi1L,
-            chi2L,
-            chip,
-            thetaJ,
-            m1,
-            m2,
-            1e6 * lal.lal.PC_SI * 100,
-            alpha,
-            0,
-            cache.deltaF,
-            cache.fmin,
-            cache.fmax,
-            40,
-            lalsimulation.IMRPhenomPv2NRTidal_V,
-            lalsimulation.NRTidalv2_V,
-            cache.WFdict,
-        )
-        h = h[0].data.data[cache.fmin_index: len(h[0].data.data)]
-        if len(h) < cache.nf:
-            h = np.append(h, np.zeros(cache.nf - len(h), dtype=complex))
-
-    return h
-
-############ END OF DOMAIN-SPECIFIC CODE ############ 
+model_class = import_from_string('rombus.PhenomP:model')
+model = model_class()
 
 def generate_training_set(greedypoints: List[np.array]) -> List[np.array]:
     """returns a list of waveforms (one for each row in 'greedypoints')"""
 
-    cache = init_cache()
-    domain = init_domain(cache)
+    cache = model.init_cache()
+    domain = model.init_domain(cache)
 
-    my_ts = np.zeros(shape=(len(greedypoints), len(domain)), dtype=model_dtype)
+    my_ts = np.zeros(shape=(len(greedypoints), len(domain)), dtype=model.model_dtype)
     for ii, params in enumerate(tqdm(greedypoints, desc=f"Generating training set for rank {RANK}")):
-        h = compute_model(params, domain, cache)
+        h = model.compute_model(params, domain, cache)
         my_ts[ii] = h / np.sqrt(np.vdot(h, h))
         # TODO: currently stored in RAM but does this need to be saved/cached on each compute node's scratch space?
 
@@ -247,7 +155,7 @@ def plot_basis(rb_matrix):
     fig.savefig("basis.png")
 
 def ROM(params, domain, cache, basis):
-    _signal_at_nodes = compute_model(params, domain, cache)
+    _signal_at_nodes = model.compute_model(params, domain, cache)
     return np.dot(_signal_at_nodes, basis)
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -321,8 +229,8 @@ def make_empirical_interpolant(ctx):
     
     eim.make(RB)
     
-    cache = init_cache()
-    domain = init_domain(cache)
+    cache = model.init_cache()
+    domain = model.init_domain(cache)
     
     fnodes = domain[eim.indices]
     
@@ -356,11 +264,11 @@ def compare_rom_to_true(ctx):
 
     params = np.array([m1, m2, chi1L, chi2L, chip, thetaJ, alpha])
 
-    cache = init_cache()
-    domain = init_domain(cache)
+    cache = model.init_cache()
+    domain = model.init_domain(cache)
 
-    h_full = compute_model(params, domain, cache)
-    h_nodes = compute_model(params, fnodes, cache)
+    h_full = model.compute_model(params, domain, cache)
+    h_nodes = model.compute_model(params, fnodes, cache)
     h_rom = ROM(params, fnodes, cache, basis)
 
     np.save("ROM_diff", np.subtract(h_rom,h_full))
