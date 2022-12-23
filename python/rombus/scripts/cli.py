@@ -119,6 +119,9 @@ def compare_rom_to_true(ctx):
     basis = np.load("B_matrix.npy")
     fnodes = np.load("fnodes.npy")
 
+    ########## THIS DOMAIN-SPECIFIC CODE HAS TO GO AT SOME POINT ########## 
+    ########## THE REAL PROBLEM HERE IS WITH HOW GREEDYPOINTS    ########## 
+    ########## ARE HANDLED; MUST GENERALISE                      ########## 
     m_min = 20
     m_max = 30
 
@@ -129,6 +132,7 @@ def compare_rom_to_true(ctx):
     chip  = np.random.uniform(low=0, high=0.8)
     thetaJ = np.random.uniform(low=0, high=np.pi)
     alpha = np.random.uniform(low=0, high=np.pi)
+    ####################################################################### 
 
     params = np.array([m1, m2, chi1L, chi2L, chip, thetaJ, alpha])
 
