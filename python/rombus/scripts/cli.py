@@ -96,8 +96,7 @@ def make_empirical_interpolant(ctx):
     
     eim.make(RB)
     
-    cache = model.init_cache()
-    domain = model.init_domain(cache)
+    domain = model.init_domain()
     
     fnodes = domain[eim.indices]
     
@@ -133,12 +132,11 @@ def compare_rom_to_true(ctx):
 
     params = np.array([m1, m2, chi1L, chi2L, chip, thetaJ, alpha])
 
-    cache = model.init_cache()
-    domain = model.init_domain(cache)
+    domain = model.init_domain()
 
-    h_full = model.compute_model(params, domain, cache)
-    h_nodes = model.compute_model(params, fnodes, cache)
-    h_rom = core.ROM(model, params, fnodes, cache, basis)
+    h_full = model.compute(params, domain)
+    h_nodes = model.compute(params, fnodes)
+    h_rom = core.ROM(model, params, fnodes, basis)
 
     np.save("ROM_diff", np.subtract(h_rom,h_full))
 
