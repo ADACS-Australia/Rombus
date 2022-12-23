@@ -46,7 +46,7 @@ def make_reduced_basis(ctx,filename_in):
     model = ctx.obj
 
     greedypoints, chunk_counts = core.divide_and_send_data_to_ranks(filename_in)
-    my_ts = core.generate_training_set(greedypoints)
+    my_ts = core.generate_training_set(model, greedypoints)
     RB_matrix = core.init_basis_matrix(my_ts[0])  # hardcoding 1st waveform to be used to start the basis
 
     error_list = []
@@ -138,7 +138,7 @@ def compare_rom_to_true(ctx):
 
     h_full = model.compute_model(params, domain, cache)
     h_nodes = model.compute_model(params, fnodes, cache)
-    h_rom = core.ROM(params, fnodes, cache, basis)
+    h_rom = core.ROM(model, params, fnodes, cache, basis)
 
     np.save("ROM_diff", np.subtract(h_rom,h_full))
 
