@@ -12,6 +12,7 @@ import pylab as plt
 from dataclasses import dataclass, field
 from typing import Dict, Protocol
 from rombus.importer import ImportFromStringError, import_from_string
+from abc import ABCMeta,abstractmethod
 
 MAIN_RANK = 0
 
@@ -19,20 +20,31 @@ COMM = MPI.COMM_WORLD
 SIZE = COMM.Get_size()
 RANK = COMM.Get_rank()
 
-class IsDataclass(Protocol):
-    # Checking for this attribute is currently the most reliable way to 
-    # ascertain that something is a dataclass
-    __dataclass_fields__: Dict
+class RombusModel(metaclass=ABCMeta):
+
+    def __init__(self):
+        self.init()
+
+    def init(self):
+        pass
+
+    @abstractmethod # make sure this is the inner-most decorator
+    def init_domain(self):
+        pass
+
+    @abstractmethod # make sure this is the inner-most decorator
+    def compute(self, params: np.array, domain) -> np.array:
+        pass
+
 
 def generate_training_set(model, greedypoints: List[np.array]) -> List[np.array]:
     """returns a list of waveforms (one for each row in 'greedypoints')"""
 
-    cache = model.init_cache()
-    domain = model.init_domain(cache)
+    domain = model.init_domain()
 
     my_ts = np.zeros(shape=(len(greedypoints), len(domain)), dtype=model.model_dtype)
     for ii, params in enumerate(tqdm(greedypoints, desc=f"Generating training set for rank {RANK}")):
-        h = model.compute_model(params, domain, cache)
+        h = model.compute(params, domain)
         my_ts[ii] = h / np.sqrt(np.vdot(h, h))
         # TODO: currently stored in RAM but does this need to be saved/cached on each compute node's scratch space?
 
@@ -144,6 +156,6 @@ def plot_basis(rb_matrix):
     plt.tight_layout()
     fig.savefig("basis.png")
 
-def ROM(model, params, domain, cache, basis):
-    _signal_at_nodes = model.compute_model(params, domain, cache)
+def ROM(model, params, domain, basis):
+    _signal_at_nodes = model.compute(params, domain)
     return np.dot(_signal_at_nodes, basis)
