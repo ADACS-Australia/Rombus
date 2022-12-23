@@ -24,10 +24,7 @@ class IsDataclass(Protocol):
     # ascertain that something is a dataclass
     __dataclass_fields__: Dict
 
-model_class = import_from_string('rombus.PhenomP:model')
-model = model_class()
-
-def generate_training_set(greedypoints: List[np.array]) -> List[np.array]:
+def generate_training_set(model, greedypoints: List[np.array]) -> List[np.array]:
     """returns a list of waveforms (one for each row in 'greedypoints')"""
 
     cache = model.init_cache()
@@ -147,6 +144,6 @@ def plot_basis(rb_matrix):
     plt.tight_layout()
     fig.savefig("basis.png")
 
-def ROM(params, domain, cache, basis):
+def ROM(model, params, domain, cache, basis):
     _signal_at_nodes = model.compute_model(params, domain, cache)
     return np.dot(_signal_at_nodes, basis)
