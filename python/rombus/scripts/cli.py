@@ -125,16 +125,16 @@ def compare_rom_to_true(ctx):
     m_min = 20
     m_max = 30
 
-    m1 = np.random.uniform(low=m_min, high=m_max)
-    m2  = np.random.uniform(low=m_min, high=m_max)
-    chi1L = np.random.uniform(low=0, high=0.8)
-    chi2L  = np.random.uniform(low=0, high=0.8)
-    chip  = np.random.uniform(low=0, high=0.8)
-    thetaJ = np.random.uniform(low=0, high=np.pi)
-    alpha = np.random.uniform(low=0, high=np.pi)
+    params = model.params_dtype(
+    m1 = np.random.uniform(low=m_min, high=m_max),
+    m2  = np.random.uniform(low=m_min, high=m_max),
+    chi1L = np.random.uniform(low=0, high=0.8),
+    chi2L  = np.random.uniform(low=0, high=0.8),
+    chip  = np.random.uniform(low=0, high=0.8),
+    thetaJ = np.random.uniform(low=0, high=np.pi),
+    alpha = np.random.uniform(low=0, high=np.pi),
+    )
     ####################################################################### 
-
-    params = np.array([m1, m2, chi1L, chi2L, chip, thetaJ, alpha])
 
     domain = model.init_domain()
 

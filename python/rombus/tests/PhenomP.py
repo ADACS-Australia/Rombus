@@ -2,12 +2,18 @@ import numpy as np
 import lalsimulation
 import lal
 from rombus.core import RombusModel
+from typing import NamedTuple
+
 
 class model(RombusModel):
 
     model_dtype = 'complex'
 
+    params = ['m1','m2','chi1L','chi2L','chip','thetaJ','alpha']
+
     def init(self):
+        self.l1 = 0
+        self.l2 = 0
         self.fmin = 20
         self.fmax = 1024
         self.deltaF = 1.0 / 4.0
@@ -19,34 +25,22 @@ class model(RombusModel):
     def init_domain(self):
         return self.fseries
 
-    def compute(self, params: np.array, domain) -> np.array:
-        m1 = params[0]
-        m2 = params[1]
-        chi1L = params[2]
-        chi2L = params[3]
-        chip = params[4]
-        thetaJ = params[5]
-        alpha = params[6]
-        l1 =0
-        l2 =0
+    def compute(self, params: NamedTuple, domain) -> np.array:
 
-        m1 *= lal.lal.MSUN_SI
-        m2 *= lal.lal.MSUN_SI
-
-        lalsimulation.SimInspiralWaveformParamsInsertTidalLambda1(self.WFdict, l1)
-        lalsimulation.SimInspiralWaveformParamsInsertTidalLambda2(self.WFdict, l2)
+        lalsimulation.SimInspiralWaveformParamsInsertTidalLambda1(self.WFdict, self.l1)
+        lalsimulation.SimInspiralWaveformParamsInsertTidalLambda2(self.WFdict, self.l2)
 
         if not np.array_equiv(domain,self.fseries):
             h = lalsimulation.SimIMRPhenomPFrequencySequence(
                 domain,
-                chi1L,
-                chi2L,
-                chip,
-                thetaJ,
-                m1,
-                m2,
+                params.chi1L,
+                params.chi2L,
+                params.chip,
+                params.thetaJ,
+                params.m1*lal.lal.MSUN_SI,
+                params.m2*lal.lal.MSUN_SI,
                 1e6 * lal.lal.PC_SI * 100,
-                alpha,
+                params.alpha,
                 0,
                 40,
                 lalsimulation.IMRPhenomPv2NRTidal_V,
@@ -56,14 +50,14 @@ class model(RombusModel):
             h = h[0].data.data
         else:
             h = lalsimulation.SimIMRPhenomP(
-                chi1L,
-                chi2L,
-                chip,
-                thetaJ,
-                m1,
-                m2,
+                params.chi1L,
+                params.chi2L,
+                params.chip,
+                params.thetaJ,
+                params.m1*lal.lal.MSUN_SI,
+                params.m2*lal.lal.MSUN_SI,
                 1e6 * lal.lal.PC_SI * 100,
-                alpha,
+                params.alpha,
                 0,
                 self.deltaF,
                 self.fmin,
