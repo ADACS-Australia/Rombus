@@ -14,10 +14,13 @@ from dataclasses import dataclass, field
 from typing import Dict, Protocol
 from rombus.importer import ImportFromStringError, import_from_string
 import rombus.core as core
+import collections
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
+FLEX_CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'],ignore_unknown_options=True,allow_extra_args=True)
 
-@click.group()
+
+@click.group(context_settings=CONTEXT_SETTINGS)
 @click.argument('model', type=str)
 @click.pass_context
 def cli(ctx, model):
@@ -106,7 +109,7 @@ def make_empirical_interpolant(ctx):
     np.save("fnodes", fnodes)
 
 
-@cli.command(context_settings=CONTEXT_SETTINGS)
+@cli.command(context_settings=FLEX_CONTEXT_SETTINGS)
 @click.pass_context
 def compare_rom_to_true(ctx):
     """Compare computed ROM to input model
@@ -114,27 +117,25 @@ def compare_rom_to_true(ctx):
     FILENAME_IN is the 'greedy points' numpy file to take as input
     """
 
+    cli_params = dict()
+    for param_i in ctx.args:
+        if not param_i.startswith('-'):
+            res = param_i.split('=')
+            if len(res)==2:
+                cli_params[res[0]]=float(res[1])
+            else:
+                raise click.ClickException(f"Don't know what to do with argument '{param_i}'")
+        else:
+            raise click.ClickException(f"Don't know what to do with option '{param_i}'")
+
     model = ctx.obj
+
+    assert collections.Counter(cli_params.keys())==collections.Counter(model.params)
 
     basis = np.load("B_matrix.npy")
     fnodes = np.load("fnodes.npy")
 
-    ########## THIS DOMAIN-SPECIFIC CODE HAS TO GO AT SOME POINT ########## 
-    ########## THE REAL PROBLEM HERE IS WITH HOW GREEDYPOINTS    ########## 
-    ########## ARE HANDLED; MUST GENERALISE                      ########## 
-    m_min = 20
-    m_max = 30
-
-    params = model.params_dtype(
-    m1 = np.random.uniform(low=m_min, high=m_max),
-    m2  = np.random.uniform(low=m_min, high=m_max),
-    chi1L = np.random.uniform(low=0, high=0.8),
-    chi2L  = np.random.uniform(low=0, high=0.8),
-    chip  = np.random.uniform(low=0, high=0.8),
-    thetaJ = np.random.uniform(low=0, high=np.pi),
-    alpha = np.random.uniform(low=0, high=np.pi),
-    )
-    ####################################################################### 
+    params = model.params_dtype(**cli_params)
 
     domain = model.init_domain()
 
