@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from typing import Dict, Protocol
 from rombus.importer import ImportFromStringError, import_from_string
 from abc import ABCMeta,abstractmethod
+from collections import namedtuple
+from typing import NamedTuple
 
 MAIN_RANK = 0
 
@@ -25,7 +27,26 @@ class RombusModel(metaclass=ABCMeta):
     def __init__(self):
         self.init()
 
+        # Ensure params is a list of strings
+        assert bool(self.params) and all(isinstance(elem, str) for elem in self.params)
+
+        # Ensure that model_dtype is a string
+        assert type(self.model_dtype)==str
+
+        # Create the named tuple that will be used for parameters
+        self.params_dtype = namedtuple('params_dtype',self.params)
+
     def init(self):
+        pass
+
+    @property
+    @abstractmethod # make sure this is the inner-most decorator
+    def model_dtype(self):
+        pass
+
+    @property
+    @abstractmethod # make sure this is the inner-most decorator
+    def params(self):
         pass
 
     @abstractmethod # make sure this is the inner-most decorator
@@ -43,7 +64,8 @@ def generate_training_set(model, greedypoints: List[np.array]) -> List[np.array]
     domain = model.init_domain()
 
     my_ts = np.zeros(shape=(len(greedypoints), len(domain)), dtype=model.model_dtype)
-    for ii, params in enumerate(tqdm(greedypoints, desc=f"Generating training set for rank {RANK}")):
+    for ii, params_numpy in enumerate(tqdm(greedypoints, desc=f"Generating training set for rank {RANK}")):
+        params = model.params_dtype(**dict(zip(model.params,params_numpy)))
         h = model.compute(params, domain)
         my_ts[ii] = h / np.sqrt(np.vdot(h, h))
         # TODO: currently stored in RAM but does this need to be saved/cached on each compute node's scratch space?
@@ -156,6 +178,6 @@ def plot_basis(rb_matrix):
     plt.tight_layout()
     fig.savefig("basis.png")
 
-def ROM(model, params, domain, basis):
+def ROM(model, params: NamedTuple, domain, basis):
     _signal_at_nodes = model.compute(params, domain)
     return np.dot(_signal_at_nodes, basis)
