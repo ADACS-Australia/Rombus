@@ -78,8 +78,6 @@ def make_reduced_basis(ctx,filename_in):
     if core.RANK == core.MAIN_RANK:
         print("\nBasis generation complete!")
         np.save("RB_matrix", RB_matrix)
-        greedypoints = np.load(filename_in)
-        np.save("GreedyPoints", greedypoints[basis_indicies])
         core.plot_errors(error_list)
         core.plot_basis(RB_matrix)
 
@@ -122,6 +120,7 @@ def compare_rom_to_true(ctx):
         if not param_i.startswith('-'):
             res = param_i.split('=')
             if len(res)==2:
+                # NOTE: for now, all parameters are assumed to be floats
                 cli_params[res[0]]=float(res[1])
             else:
                 raise click.ClickException(f"Don't know what to do with argument '{param_i}'")

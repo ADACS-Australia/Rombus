@@ -65,7 +65,7 @@ def generate_training_set(model, greedypoints: List[np.array]) -> List[np.array]
 
     my_ts = np.zeros(shape=(len(greedypoints), len(domain)), dtype=model.model_dtype)
     for ii, params_numpy in enumerate(tqdm(greedypoints, desc=f"Generating training set for rank {RANK}")):
-        params = model.params_dtype(**dict(zip(model.params,params_numpy)))
+        params = model.params_dtype(**dict(zip(model.params,np.atleast_1d(params_numpy))))
         h = model.compute(params, domain)
         my_ts[ii] = h / np.sqrt(np.vdot(h, h))
         # TODO: currently stored in RAM but does this need to be saved/cached on each compute node's scratch space?
@@ -77,7 +77,13 @@ def divide_and_send_data_to_ranks(datafile: str) -> Tuple[List[np.array], Dict]:
     chunks = None
     chunk_counts = None
     if RANK == MAIN_RANK:
-        greedypoints = np.load(datafile)
+        if datafile.endswith('.npy'):
+            greedypoints = np.load(datafile)
+        elif datafile.endswith('.csv'):
+            greedypoints = np.genfromtxt(datafile, delimiter=',')
+        else:
+            raise Exception
+
         chunks = [[] for _ in range(SIZE)]
         for i, chunk in enumerate(greedypoints):
             chunks[i % SIZE].append(chunk)
