@@ -1,9 +1,7 @@
 import click
 import numpy as np
-import lalsimulation
 from rombus.misc import *
 import rombus as rb
-import lal
 import sys
 from mpi4py import MPI
 from tqdm.auto import tqdm
