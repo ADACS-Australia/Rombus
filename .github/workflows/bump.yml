@@ -2,10 +2,8 @@ name: Bump version in git
 
 on:
   pull_request:
-    types:
-    - closed
-    branches: 
-    - [ $default-branch ]
+    types: [closed]
+    branches: [ $default-branch ]
 jobs:
   if_merged:    
     runs-on: ubuntu-latest
