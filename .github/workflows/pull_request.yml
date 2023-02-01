@@ -1,11 +1,12 @@
 name: Publish
 
 on:
-  release:
-    types: [created]
+  pull_request:
+    types:
+    - opened
 
 jobs:
-  publish:
+  run_tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -32,13 +33,18 @@ jobs:
       run: |
         poetry version $(git describe --tags --abbrev=0)
 
-    - name: Trigger RTDs build
+    - name: Install the project
       run: |
-        curl -X POST                                                    \
-             -H "Authorization: Token ${{ secrets.RTD_WEBHOOK_TOKEN }}" \
-             ${{ secrets.RTD_WEBHOOK_URL_ROMBUS }}
+        poetry install --no-interaction --extras docs
 
-    - name: Publish to PyPI
+    - name: Generate build
       run: |
-        poetry config http-basic.pypi "__token__" ${{ secrets.PYPI_TOKEN }}
-        poetry publish --build
+        poetry build
+
+    - name: Code tests
+      run: |
+        poetry run pytest 
+
+    - name: Documentation build test
+      run: |
+        poetry run make html

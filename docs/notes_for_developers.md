@@ -1,5 +1,11 @@
 # Notes for Developers
 
+## Branches
+
+Development should not be conducted on the 'main' branch.  Merges to this branch have been limited to Pull Requests only.
+Once a Pull Request is opened for the 'main' branch, the project tests are run.  When it is closed, the version is
+automatically incremented (see below).
+
 ## Versioning
 
 Semantic versioning (i.e. a scheme that follows a `vMAJOR.MINOR.PATCH` format; see <https://semver.org> for details) is used for this project.  The single point of truth for the current production version is the last git tag on the main branch with a `v[0-9]*` format.
@@ -44,7 +50,9 @@ A local copy of the code can be configured as follows:
 	* navigate to the GitHub page hosting the project and click on the `fork` button at the top of the page;
 	* Edit the details you want to have for the new repoitory; and
 	* Press `Create fork`,
-	* Generate a local 
+	* Generate a local copy
+    * Protect the main branch to only permit merges from pull requests.  This can be done by clicking on the 'branches' tab and clicking on the 'Protect this branch' button for the 'main' branch.  This is needed to ensure that the versioning is managed consistently.
+    * Select 'Require status checks to pass before merging' when you set-up this branch protection rule.
 
 2. If you want to work from a local clone:
 	* First grab a local copy of the code (e.g. `git clone <url>` where `<url>` can be obtained by clicking on the green `Code` button on the project GitHub page);

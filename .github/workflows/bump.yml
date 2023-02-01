@@ -1,11 +1,13 @@
 name: Bump version in git
 
 on:
-  push:
+  pull_request:
+    types:
+    - closed
     branches: 
-    - main
+    - [ $default-branch ]
 jobs:
-  build-and-deploy:    
+  if_merged:    
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
