@@ -27,6 +27,7 @@ clean:
 	@find docs/ -type f -name '*.rst' -not -name 'overview.rst' -delete
 apidoc:
 	@find docs/ -type f -name '*.rst' -not -name 'overview.rst' -delete
+	@echo "Building documentation for version: "${PKG_VERSION}
 	sphinx-apidoc -o docs --doc-project ${PKG_PROJECT} --doc-author "${PKG_AUTHOR}" --doc-version ${PKG_VERSION} --doc-release ${PKG_RELEASE} -t docs/_templates -T --extensions sphinx.ext.doctest,sphinx.ext.mathjax,sphinx.ext.autosectionlabel,myst_parser,sphinx.ext.todo -d 3 -E -f -F python/${PKG_PROJECT}
 
 # Catch-all target: route all unknown targets to Sphinx using the new
