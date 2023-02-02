@@ -3,6 +3,7 @@ from rombus.scripts.cli import cli
 from click.testing import CliRunner
 import numpy as np
 
+@pytest.mark.lalsuite
 def test_PhenomP(tmp_path):
 
     atol = 1e-12

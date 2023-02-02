@@ -41,6 +41,9 @@ rombus = "rombus.scripts.cli:cli"
 [tool.poetry.group.dev.dependencies]
 black = "^22.10.0"
 
+[tool.pytest.ini_options]
+markers = [ "lalsuite: Tests that require LALSuite to be installed" ]
+
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
