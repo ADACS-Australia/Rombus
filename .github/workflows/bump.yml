@@ -8,13 +8,16 @@ jobs:
   if_merged:    
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 50
-        fetch-tags: true
+    - name: Check-out repo
+      uses: actions/checkout@v2
+      #      uses: actions/checkout@v3
+      #      with:
+      #        fetch-depth: 50
+      #        fetch-tags: true
 
     - name: Bump version
       run: |
         git config --global user.email "github+actions@gmail.com"
         git config --global user.name "Actions"
+        git fetch --tags
         wget -O - https://raw.githubusercontent.com/treeder/bump/master/gitbump.sh | bash

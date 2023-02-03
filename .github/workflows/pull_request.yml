@@ -12,10 +12,11 @@ jobs:
 
     # Dependencies
     - name: Check-out repo
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 50
-        fetch-tags: true
+      uses: actions/checkout@v2
+      #      uses: actions/checkout@v3
+      #      with:
+      #        fetch-depth: 50
+      #        fetch-tags: true
 
     - name: Set-up MPI
       uses: mpi4py/setup-mpi@v1
