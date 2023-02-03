@@ -13,9 +13,9 @@ jobs:
     # Dependencies
     - name: Check-out repo
       uses: actions/checkout@v3
-
-    - name: Fetch tags
-      run: git fetch --tags origin # needed to get the version tag; see https://github.com/actions/checkout/issues/290
+      with:
+        fetch-depth: 50
+        fetch-tags: true
 
     - name: Set-up MPI
       uses: mpi4py/setup-mpi@v1
