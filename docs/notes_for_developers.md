@@ -67,6 +67,9 @@ Configure your *GitHub* repository following the directions [here](https://docs.
 
 You will also need to configure the following 'secrets' for the repository: PYPI_TOKEN, RTD_WEBHOOK_TOKEN and RTD_WEBHOOK_URL_ROMBUS
 
+Once a webhook with GitHub has been established on ReadtheDocs, the RTD_WEBHOOK_URL_ROMBUS URL can be found my migrating to
+the Admin->Integrations tab on the RTD project page.
+
 This can be done by navigating to `Settings->Secrets->Actions`.  These need to be generated through the respective services.
 
 ### *Read the Docs*
