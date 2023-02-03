@@ -13,6 +13,9 @@ jobs:
     - name: Check-out repo
       uses: actions/checkout@v3
 
+    - name: Fetch tags
+      run: git fetch --tags origin # needed to get the version tag; see https://github.com/actions/checkout/issues/290
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
