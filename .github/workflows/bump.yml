@@ -13,5 +13,5 @@ jobs:
       run: |
         git config --global user.email "github+actions@gmail.com"
         git config --global user.name "Actions"
-        git fetch --tags
+        git fetch --force --tags # needed to get the version tag; see https://github.com/actions/checkout/issues/290
         wget -O - https://raw.githubusercontent.com/treeder/bump/master/gitbump.sh | bash
