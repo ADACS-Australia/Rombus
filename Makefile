@@ -8,11 +8,9 @@ SOURCEDIR     = docs
 BUILDDIR      = docs/_build
 
 # Set some variables needed by the documentation
-# TODO: Ideally, PKG_PROJECT would be extracted from the TOML file correctly.  This will be easier with Python 3.11, which will include tomllib automatically
-# TODO: Ideally, PKG_VERSION would be extracted from the TOML file in the same way, and version would be set there from the git tag.
-PKG_PROJECT := rombus
-PKG_AUTHOR  := `poetry run python3 -c 'from importlib.metadata import metadata; print(metadata("${PKG_PROJECT}")["author"])'`
-PKG_VERSION := `git describe --tags --abbrev=0`
+PKG_PROJECT := $(shell poetry run python3 -c 'from tomllib import load;print(load(open("pyproject.toml","rb"))["tool"]["poetry"]["name"])')
+PKG_AUTHOR  := $(shell poetry run python3 -c 'from importlib.metadata import metadata; print(metadata("${PKG_PROJECT}")["author"])')
+PKG_VERSION := `poetry run git describe --tags --abbrev=0`
 PKG_RELEASE := ${PKG_VERSION}
 
 # Put it first so that "make" without argument is like "make help".
@@ -27,7 +25,10 @@ clean:
 	@find docs/ -type f -name '*.rst' -not -name 'overview.rst' -delete
 apidoc:
 	@find docs/ -type f -name '*.rst' -not -name 'overview.rst' -delete
-	@echo "Building documentation for version: "${PKG_VERSION}
+	@echo "Building documentation for:"
+	@echo "   project: "${PKG_PROJECT}
+	@echo "   author:  "${PKG_AUTHOR}
+	@echo "   version: "${PKG_VERSION}
 	sphinx-apidoc -o docs --doc-project ${PKG_PROJECT} --doc-author "${PKG_AUTHOR}" --doc-version ${PKG_VERSION} --doc-release ${PKG_RELEASE} -t docs/_templates -T --extensions sphinx.ext.doctest,sphinx.ext.mathjax,sphinx.ext.autosectionlabel,myst_parser,sphinx.ext.todo -d 3 -E -f -F python/${PKG_PROJECT}
 
 # Catch-all target: route all unknown targets to Sphinx using the new
