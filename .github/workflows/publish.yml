@@ -13,9 +13,6 @@ jobs:
     - name: Check-out repo
       uses: actions/checkout@v3
 
-    - name: Fetch tags
-      run: git fetch --force --tags # needed to get the version tag; see https://github.com/actions/checkout/issues/290
-
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -34,6 +31,7 @@ jobs:
 
     - name: Set project version
       run: |
+        git fetch --force --tags # needed to get the version tag; see https://github.com/actions/checkout/issues/290
         poetry version $(git describe --tags --abbrev=0)
 
     - name: Trigger RTDs build
