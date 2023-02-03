@@ -12,6 +12,8 @@ jobs:
 
     - name: Check-out repo
       uses: actions/checkout@v3
+
+    - name: Fetch tags
       run: git fetch --force --tags # needed to get the version tag; see https://github.com/actions/checkout/issues/290
 
     - name: Set up Python
