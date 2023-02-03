@@ -1,20 +1,19 @@
 name: Bump version in git
 
 on:
-  pull_request:
-    types: [closed]
+  push:
+    branches: 
     branches: [ $default-branch ]
 jobs:
-  if_merged:    
-    runs-on: ubuntu-latest
-    steps:
-    - name: Check-out repo
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+  runs-on: ubuntu-latest
+  steps:
+  - name: Check-out repo
+    uses: actions/checkout@v3
+    with:
+      fetch-depth: 0
 
-    - name: Bump version
-      run: |
-        git config --global user.email "github+actions@gmail.com"
-        git config --global user.name "Actions"
-        wget -O - https://raw.githubusercontent.com/treeder/bump/master/gitbump.sh | bash
+  - name: Bump version
+    run: |
+      git config --global user.email "github+actions@gmail.com"
+      git config --global user.name "Actions"
+      wget -O - https://raw.githubusercontent.com/treeder/bump/master/gitbump.sh | bash
