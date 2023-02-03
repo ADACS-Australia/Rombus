@@ -2,8 +2,7 @@ name: Bump version in git
 
 on:
   push:
-    branches: 
-    branches: [ $default-branch ]
+    branches: main
 jobs:
   runs-on: ubuntu-latest
   steps:
