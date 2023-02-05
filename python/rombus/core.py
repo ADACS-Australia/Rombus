@@ -10,7 +10,7 @@ import pylab as plt
 from dataclasses import dataclass, field
 from typing import Dict, Protocol
 from rombus.importer import ImportFromStringError, import_from_string
-from abc import ABCMeta,abstractmethod
+from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 from typing import NamedTuple
 
@@ -20,8 +20,8 @@ COMM = MPI.COMM_WORLD
 SIZE = COMM.Get_size()
 RANK = COMM.Get_rank()
 
-class RombusModel(metaclass=ABCMeta):
 
+class RombusModel(metaclass=ABCMeta):
     def __init__(self):
         self.init()
 
@@ -29,29 +29,29 @@ class RombusModel(metaclass=ABCMeta):
         assert bool(self.params) and all(isinstance(elem, str) for elem in self.params)
 
         # Ensure that model_dtype is a string
-        assert type(self.model_dtype)==str
+        assert type(self.model_dtype) == str
 
         # Create the named tuple that will be used for parameters
-        self.params_dtype = namedtuple('params_dtype',self.params)
+        self.params_dtype = namedtuple("params_dtype", self.params)
 
     def init(self):
         pass
 
     @property
-    @abstractmethod # make sure this is the inner-most decorator
+    @abstractmethod  # make sure this is the inner-most decorator
     def model_dtype(self):
         pass
 
     @property
-    @abstractmethod # make sure this is the inner-most decorator
+    @abstractmethod  # make sure this is the inner-most decorator
     def params(self):
         pass
 
-    @abstractmethod # make sure this is the inner-most decorator
+    @abstractmethod  # make sure this is the inner-most decorator
     def init_domain(self):
         pass
 
-    @abstractmethod # make sure this is the inner-most decorator
+    @abstractmethod  # make sure this is the inner-most decorator
     def compute(self, params: np.array, domain) -> np.array:
         pass
 
@@ -62,23 +62,28 @@ def generate_training_set(model, greedypoints: List[np.array]) -> List[np.array]
     domain = model.init_domain()
 
     my_ts = np.zeros(shape=(len(greedypoints), len(domain)), dtype=model.model_dtype)
-    for ii, params_numpy in enumerate(tqdm(greedypoints, desc=f"Generating training set for rank {RANK}")):
-        params = model.params_dtype(**dict(zip(model.params,np.atleast_1d(params_numpy))))
+    for ii, params_numpy in enumerate(
+        tqdm(greedypoints, desc=f"Generating training set for rank {RANK}")
+    ):
+        params = model.params_dtype(
+            **dict(zip(model.params, np.atleast_1d(params_numpy)))
+        )
         h = model.compute(params, domain)
         my_ts[ii] = h / np.sqrt(np.vdot(h, h))
         # TODO: currently stored in RAM but does this need to be saved/cached on each compute node's scratch space?
 
     return my_ts
 
+
 def divide_and_send_data_to_ranks(datafile: str) -> Tuple[List[np.array], Dict]:
     # dividing greedypoints into chunks
     chunks = None
     chunk_counts = None
     if RANK == MAIN_RANK:
-        if datafile.endswith('.npy'):
+        if datafile.endswith(".npy"):
             greedypoints = np.load(datafile)
-        elif datafile.endswith('.csv'):
-            greedypoints = np.genfromtxt(datafile, delimiter=',')
+        elif datafile.endswith(".csv"):
+            greedypoints = np.genfromtxt(datafile, delimiter=",")
         else:
             raise Exception
 
@@ -106,12 +111,17 @@ def add_next_waveform_to_basis(RB_matrix, pc_matrix, my_ts, iter):
     # project training set on basis + get errors
     pc = project_onto_basis(1.0, RB_matrix, my_ts, iter - 1, complex)
     pc_matrix.append(pc)
-    #projection_errors = [
+    # projection_errors = [
     #    1 - dot_product(1.0, np.array(pc_matrix).T[jj], np.array(pc_matrix).T[jj])
     #    for jj in range(len(np.array(pc_matrix).T))
-    #]
-    #_l = len(np.array(pc_matrix).T)
-    projection_errors = list(1-np.einsum('ij,ij->i', np.array(np.conjugate(pc_matrix)).T,np.array(pc_matrix).T ))
+    # ]
+    # _l = len(np.array(pc_matrix).T)
+    projection_errors = list(
+        1
+        - np.einsum(
+            "ij,ij->i", np.array(np.conjugate(pc_matrix)).T, np.array(pc_matrix).T
+        )
+    )
     # gather all errors (below is a list[ rank0_errors, rank1_errors...])
     all_rank_errors = COMM.gather(projection_errors, root=MAIN_RANK)
 
@@ -121,7 +131,9 @@ def add_next_waveform_to_basis(RB_matrix, pc_matrix, my_ts, iter):
         err_rank, err_idx, error = error_data
     else:
         error_data = None, None, None
-    error_data = COMM.bcast( error_data, root=MAIN_RANK)  # share the error data with all nodes
+    error_data = COMM.bcast(
+        error_data, root=MAIN_RANK
+    )  # share the error data with all nodes
     err_rank, err_idx, error = error_data
 
     # get waveform with the worst error
@@ -146,7 +158,7 @@ def add_next_waveform_to_basis(RB_matrix, pc_matrix, my_ts, iter):
 
 def loop_log(iter, err_rnk, err_idx, err):
     m = f">>> Iter {iter:003}: err {err:.1E} (rank {err_rnk:002}@idx{err_idx:003})"
-    sys.stdout.write('\033[K' + m + '\r')
+    sys.stdout.write("\033[K" + m + "\r")
 
 
 def convert_to_basis_index(rank_number, rank_idx, rank_counts):
@@ -159,7 +171,7 @@ def plot_errors(err_list):
     plt.plot(err_list)
     plt.xlabel("# Basis elements")
     plt.ylabel("Error")
-    plt.yscale('log')
+    plt.yscale("log")
     plt.tight_layout()
     plt.savefig("basis_error.png")
 
@@ -181,6 +193,7 @@ def plot_basis(rb_matrix):
         ax[i].set_title(f"Basis element {start_i:003}-{end_i:003}")
     plt.tight_layout()
     fig.savefig("basis.png")
+
 
 def ROM(model, params: NamedTuple, domain, basis):
     _signal_at_nodes = model.compute(params, domain)

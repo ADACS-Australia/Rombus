@@ -7,9 +7,9 @@ from typing import NamedTuple
 
 class model(RombusModel):
 
-    model_dtype = 'complex'
+    model_dtype = "complex"
 
-    params = ['m1','m2','chi1L','chi2L','chip','thetaJ','alpha']
+    params = ["m1", "m2", "chi1L", "chi2L", "chip", "thetaJ", "alpha"]
 
     def init(self):
         self.l1 = 0
@@ -17,7 +17,7 @@ class model(RombusModel):
         self.fmin = 20
         self.fmax = 1024
         self.deltaF = 1.0 / 4.0
-        self.nf = int((self.fmax-self.fmin)/self.deltaF)+1
+        self.nf = int((self.fmax - self.fmin) / self.deltaF) + 1
         self.fseries = np.linspace(self.fmin, self.fmax, self.nf)
         self.fmin_index = int(self.fmin / self.deltaF)
         self.WFdict = lal.CreateDict()
@@ -30,15 +30,15 @@ class model(RombusModel):
         lalsimulation.SimInspiralWaveformParamsInsertTidalLambda1(self.WFdict, self.l1)
         lalsimulation.SimInspiralWaveformParamsInsertTidalLambda2(self.WFdict, self.l2)
 
-        if not np.array_equiv(domain,self.fseries):
+        if not np.array_equiv(domain, self.fseries):
             h = lalsimulation.SimIMRPhenomPFrequencySequence(
                 domain,
                 params.chi1L,
                 params.chi2L,
                 params.chip,
                 params.thetaJ,
-                params.m1*lal.lal.MSUN_SI,
-                params.m2*lal.lal.MSUN_SI,
+                params.m1 * lal.lal.MSUN_SI,
+                params.m2 * lal.lal.MSUN_SI,
                 1e6 * lal.lal.PC_SI * 100,
                 params.alpha,
                 0,
@@ -54,8 +54,8 @@ class model(RombusModel):
                 params.chi2L,
                 params.chip,
                 params.thetaJ,
-                params.m1*lal.lal.MSUN_SI,
-                params.m2*lal.lal.MSUN_SI,
+                params.m1 * lal.lal.MSUN_SI,
+                params.m2 * lal.lal.MSUN_SI,
                 1e6 * lal.lal.PC_SI * 100,
                 params.alpha,
                 0,
@@ -67,7 +67,7 @@ class model(RombusModel):
                 lalsimulation.NRTidalv2_V,
                 self.WFdict,
             )
-            h = h[0].data.data[self.fmin_index: len(h[0].data.data)]
+            h = h[0].data.data[self.fmin_index : len(h[0].data.data)]
             if len(h) < self.nf:
                 h = np.append(h, np.zeros(self.nf - len(h), dtype=complex))
 
