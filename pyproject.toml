@@ -31,16 +31,20 @@ myst-parser = { version = "^0.18.1", optional = true }
 pre-commit = { version = "^3.0.4", optional = true }
 pytest = { version = "^7.0", optional = true }
 black = { version = "^22.10.0", optional = true }
+isort = { version = "^5.12.0", optional = true }
 
 [tool.poetry.extras]
 docs = ["Sphinx", "sphinx-rtd-theme", "myst-parser"]
-dev = ["pre-commit", "pytest", "black"]
+dev = ["pre-commit", "pytest", "black", "isort"]
 
 [tool.poetry.scripts]
 rombus = "rombus.scripts.cli:cli"
 
 [tool.pytest.ini_options]
 markers = [ "lalsuite: Tests that require LALSuite to be installed" ]
+
+[tool.isort]
+profile = "black"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

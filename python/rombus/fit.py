@@ -6,14 +6,13 @@
 
 
 import numpy as np
-from scipy.interpolate import splrep
-from scipy.interpolate import splev
+import scipy.optimize as opt
+from scipy.interpolate import splev, splrep
 
 # from scipy.optimize import curve_fit
 from scipy.optimize import leastsq
-import scipy.optimize as opt
-from . import eim, lib
 
+from . import eim, lib
 
 ##############################################
 # The following three functions (_general_function, _weighted_general_function,

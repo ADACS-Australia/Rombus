@@ -1,18 +1,19 @@
-import click
-import numpy as np
-from rombus.misc import *
-import rombus as rb
+import collections
 import sys
+from dataclasses import dataclass, field
+from typing import Dict, List, Protocol, Tuple
+
+import click
+import matplotlib.pyplot as plt
+import numpy as np
+import pylab as plt
 from mpi4py import MPI
 from tqdm.auto import tqdm
-import matplotlib.pyplot as plt
-from typing import List, Tuple, Dict
-import pylab as plt
-from dataclasses import dataclass, field
-from typing import Dict, Protocol
-from rombus.importer import ImportFromStringError, import_from_string
+
+import rombus as rb
 import rombus.core as core
-import collections
+from rombus.importer import ImportFromStringError, import_from_string
+from rombus.misc import *
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 FLEX_CONTEXT_SETTINGS = dict(

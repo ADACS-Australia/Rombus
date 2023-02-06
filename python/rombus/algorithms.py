@@ -11,11 +11,14 @@ Standard algorithms for::
 
 __author__ = "Chad Galley <crgalley@gmail.com>"
 
-import numpy as np, time
-from .greedy import *
+import time
+
+import numpy as np
+
+from . import lib
 from .eim import *
 from .fit import Spline1d
-from . import lib
+from .greedy import *
 
 
 ##############################################

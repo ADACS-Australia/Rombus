@@ -6,8 +6,9 @@
 
 __author__ = "Chad Galley <crgalley@gmail.com>"
 
-import numpy as np
 import random
+
+import numpy as np
 from numpy import asarray
 
 

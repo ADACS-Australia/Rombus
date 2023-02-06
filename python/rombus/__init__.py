@@ -68,19 +68,16 @@ __email__ = "crgalley@tapir.caltech.edu, crgalley@gmail.com"
 __author__ = "Chad Galley"
 
 
-import numpy as np
-import time
 import random
+import time
 
+import numpy as np
 
-from .integrals import *
-from .greedy import *
+from . import algorithms, training
 from .eim import *
-from .lib import *
 from .fit import *
-
-
-from . import algorithms
-from . import training
+from .greedy import *
+from .integrals import *
+from .lib import *
 
 # import eft

@@ -6,10 +6,11 @@
 
 __author__ = "Chad Galley <crgalley@gmail.com>"
 
+import numpy as np
+
 # from __init__ import np
 # import adipy
 from . import lib
-import numpy as np
 
 
 ##############################################

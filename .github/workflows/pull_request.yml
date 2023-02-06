@@ -36,6 +36,10 @@ jobs:
     - name: Set project version
       run: poetry version $(git describe --tags --abbrev=0)
 
+    # Enforce code formating standards
+    - name: Install the project
+      run: poetry run isort .
+
     # Run tests
     - name: Install the project
       run: poetry install --no-interaction --extras docs

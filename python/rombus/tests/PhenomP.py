@@ -1,8 +1,10 @@
-import numpy as np
-import lalsimulation
-import lal
-from rombus.core import RombusModel
 from typing import NamedTuple
+
+import lal
+import lalsimulation
+import numpy as np
+
+from rombus.core import RombusModel
 
 
 class model(RombusModel):

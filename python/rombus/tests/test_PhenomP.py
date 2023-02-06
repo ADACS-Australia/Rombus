@@ -1,7 +1,8 @@
-import pytest
-from rombus.scripts.cli import cli
-from click.testing import CliRunner
 import numpy as np
+import pytest
+from click.testing import CliRunner
+
+from rombus.scripts.cli import cli
 
 
 @pytest.mark.lalsuite
