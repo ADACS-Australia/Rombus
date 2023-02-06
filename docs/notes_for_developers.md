@@ -48,7 +48,7 @@ Releases are generated through the GitHub UI.  A GitHub workflow has been config
 
 To generate a new release, do the following:
 
-* Navigate to the project's GitHub page, 
+* Navigate to the project's GitHub page,
 * Click on `Releases` in the sidebar,
 * Click on `Create a new release` if this is the first release you have generatede, or `draft release` if this is a subsequent release,
 * If this release is a PATCH (i.e. no new features or breaking changes) then click on `Choose a tag` and select the most recent version listed; otherwise, if it is a new feature with no breaking
@@ -71,7 +71,7 @@ This section details how to grab a copy of this code and configure it for develo
 
 A local copy of the code can be configured as follows:
 
-1. Create a fork: 
+1. Create a fork:
 	* navigate to the GitHub page hosting the project and click on the `fork` button at the top of the page;
 	* Edit the details you want to have for the new repoitory; and
 	* Press `Create fork`,

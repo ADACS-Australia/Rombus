@@ -47,7 +47,7 @@ jobs:
       run: poetry build
 
     - name: Code tests
-      run: poetry run pytest 
+      run: poetry run pytest
 
     - name: Documentation build test
       run: poetry run make html
