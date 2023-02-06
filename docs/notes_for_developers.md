@@ -6,6 +6,31 @@ Development should not be conducted on the 'main' branch.  Merges to this branch
 Once a Pull Request is opened for the 'main' branch, the project tests are run.  When it is closed, the version is
 automatically incremented (see below).
 
+## Git Hooks
+
+This project has been set-up (and should be maintained) in such a way that policies such as code quality and the passing of unit tests are not ultimately enforced by them.  Instead: git hooks are a means to augment (at least some) of the standards enforced by the continuous integration (see below), rather than as a means of enforcing them.  Running quick checks (like linting) at the point of commiting code can save time that might otherwise be lost later (for example) at the release stage when testing needs to be rigorous and policy enforcement generally fails slower.  Developers can choose to either:
+
+- use the git hooks defined by this project (see below for instructions)
+- not to use them, and rely purely on the CI workflow (see below) to enforce all project policies
+- configure their IDE of choice to manage things, in which case it is up to them to make sure that this aligns with the
+  policies being enforced by CI
+
+If developers would like to utilise the git hooks provided by this project, they just need to make sure that the Poetry
+developer dependencies are installed and then run the following command from within the project:
+
+$ pre-commit
+
+### Changing/maintaining git hooks
+
+The git hooks are defined in the `.pre-commit-config.yaml` file.  Specific revisions for many of the tools listed should be
+managed with Poetry, with syncing managed with the [sync_with_poetry
+repo](https://github.com/floatingpurr/sync_with_poetry).  Developers should take care not to use this script to enforce any
+project policies.  That should all be done within the continuous integration workflows (see below).  Instead: these should
+just be quality-of-life checks that fix minor issues or prevent the propagation of quick-and-easy-to-detect problems which
+would otherwise be caught by the CI later with considerably more latency.  Furthermore, ensure that the checks performed
+here are consistant between the hooks and the CI.  For example: make sure that any linting/code quality checks are executed
+with the same tools and options.
+
 ## Versioning
 
 Semantic versioning (i.e. a scheme that follows a `vMAJOR.MINOR.PATCH` format; see <https://semver.org> for details) is used for this project.  The single point of truth for the current production version is the last git tag on the main branch with a `v[0-9]*` format.
