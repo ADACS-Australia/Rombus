@@ -1,18 +1,14 @@
 import sys
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
-from dataclasses import dataclass, field
-from typing import Dict, List, NamedTuple, Protocol, Tuple
+from typing import Dict, List, NamedTuple, Tuple
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pylab as plt
 from mpi4py import MPI
 from tqdm.auto import tqdm
 
-import rombus as rb
-from rombus.importer import ImportFromStringError, import_from_string
-from rombus.misc import *
+import rombus.misc as misc
 
 MAIN_RANK = 0
 
@@ -52,11 +48,11 @@ class RombusModel(metaclass=ABCMeta):
         pass
 
     @abstractmethod  # make sure this is the inner-most decorator
-    def compute(self, params: np.array, domain) -> np.array:
+    def compute(self, params: np.ndarray, domain) -> np.ndarray:
         pass
 
 
-def generate_training_set(model, greedypoints: List[np.array]) -> List[np.array]:
+def generate_training_set(model, greedypoints: List[np.ndarray]) -> np.ndarray:
     """returns a list of waveforms (one for each row in 'greedypoints')"""
 
     domain = model.init_domain()
@@ -70,12 +66,13 @@ def generate_training_set(model, greedypoints: List[np.array]) -> List[np.array]
         )
         h = model.compute(params, domain)
         my_ts[ii] = h / np.sqrt(np.vdot(h, h))
-        # TODO: currently stored in RAM but does this need to be saved/cached on each compute node's scratch space?
+        # TODO: currently stored in RAM but does this need to be saved/cached on each
+        #       compute node's scratch space?
 
     return my_ts
 
 
-def divide_and_send_data_to_ranks(datafile: str) -> Tuple[List[np.array], Dict]:
+def divide_and_send_data_to_ranks(datafile: str) -> Tuple[List[np.ndarray], Dict]:
     # dividing greedypoints into chunks
     chunks = None
     chunk_counts = None
@@ -109,7 +106,7 @@ def init_basis_matrix(init_waveform):
 
 def add_next_waveform_to_basis(RB_matrix, pc_matrix, my_ts, iter):
     # project training set on basis + get errors
-    pc = project_onto_basis(1.0, RB_matrix, my_ts, iter - 1, complex)
+    pc = misc.project_onto_basis(1.0, RB_matrix, my_ts, iter - 1, complex)
     pc_matrix.append(pc)
     # projection_errors = [
     #    1 - dot_product(1.0, np.array(pc_matrix).T[jj], np.array(pc_matrix).T[jj])
@@ -127,7 +124,7 @@ def add_next_waveform_to_basis(RB_matrix, pc_matrix, my_ts, iter):
 
     # determine  highest error
     if RANK == MAIN_RANK:
-        error_data = get_highest_error(all_rank_errors)
+        error_data = misc.get_highest_error(all_rank_errors)
         err_rank, err_idx, error = error_data
     else:
         error_data = None, None, None
@@ -149,7 +146,7 @@ def add_next_waveform_to_basis(RB_matrix, pc_matrix, my_ts, iter):
     # adding worst waveform to baisis
     if RANK == MAIN_RANK:
         # Gram-Schmidt to get the next basis and normalize
-        RB_matrix.append(IMGS(RB_matrix, worst_waveform, iter))
+        RB_matrix.append(misc.IMGS(RB_matrix, worst_waveform, iter))
 
     # share the basis with ALL nodes
     RB_matrix = COMM.bcast(RB_matrix, root=MAIN_RANK)

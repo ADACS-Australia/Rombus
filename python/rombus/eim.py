@@ -1,7 +1,7 @@
 # --- eim.py ---
 
 """
-	Classes for the empirical interpolation method
+    Classes for the empirical interpolation method
 """
 
 __author__ = "Chad Galley <crgalley@gmail.com>"
@@ -21,7 +21,6 @@ class LinAlg:
     def __init__(self):
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     # This is scipy.linalg's source code. For some reason my scipy doesn't recognize
     # the check_finite option, which may help with speeding up. Because this may be an
     # issue related to the latest scipy.linalg version, I'm reproducing that code here
@@ -115,7 +114,6 @@ class LinAlg:
             )
         raise ValueError("illegal value in %d-th argument of internal trtrs" % -info)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def transpose(self, a):
         dim = a.shape
         if len(dim) != 2:
@@ -132,11 +130,9 @@ class EmpiricalInterpolation(LinAlg):
     Class for building an empirical interpolant
     """
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def __init__(self):
         LinAlg.__init__(self)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def malloc(self, Nbasis, Nquads, Nmodes=1, dtype="complex"):
         self.indices = lib.malloc("int", Nbasis)
         self.invV = lib.malloc(dtype, Nbasis, Nbasis)
@@ -144,30 +140,26 @@ class EmpiricalInterpolation(LinAlg):
         self.B = lib.malloc(dtype, Nbasis, Nquads)
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def coefficient(self, invV, e, indices):
         return np.dot(invV.T, e[indices])
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def residual(self, e, c, R):
         """Difference between a basis function 'e' and its empirical interpolation"""
         return e - np.dot(c, R)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def next_invV_col(self, R, indices, check_finite=False):
         b = np.zeros(len(indices), dtype=R.dtype)
         b[-1] = 1.0
         return self.solve_triangular(
             R[:, indices], b, lower=False, check_finite=check_finite
         )
-        # return solve_triangular(R[:,indices], b, lower=False, check_finite=check_finite)
+        # return solve_triangular(
+        #    R[:,indices], b, lower=False, check_finite=check_finite)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def eim_interpolant(self, invV, R):
         """The empirical interpolation matrix 'B'"""
         return np.dot(invV, R)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def eim_interpolate(self, h, indices, B):
         """Empirically interpolate a function"""
         dim = np.shape(h)

@@ -37,7 +37,10 @@ jobs:
       run: poetry version $(git describe --tags --abbrev=0)
 
     # Enforce code formating standards
-    - name: Install the project
+    - name: Lint the code
+      run: poetry run flake8 .
+
+    - name: Check organisation of imports
       run: poetry run isort .
 
     # Run tests

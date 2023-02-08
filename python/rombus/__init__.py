@@ -62,22 +62,3 @@
    view the docstring) and ``rb.greedy??<ENTER>`` (to view the source
    code).
    """
-
-__copyright__ = "Copyright (C) 2013 Chad R. Galley"
-__email__ = "crgalley@tapir.caltech.edu, crgalley@gmail.com"
-__author__ = "Chad Galley"
-
-
-import random
-import time
-
-import numpy as np
-
-from . import algorithms, training
-from .eim import *
-from .fit import *
-from .greedy import *
-from .integrals import *
-from .lib import *
-
-# import eft

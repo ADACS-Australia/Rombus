@@ -1,19 +1,13 @@
 import collections
 import sys
-from dataclasses import dataclass, field
-from typing import Dict, List, Protocol, Tuple
 
 import click
-import matplotlib.pyplot as plt
 import numpy as np
 import pylab as plt
-from mpi4py import MPI
-from tqdm.auto import tqdm
 
-import rombus as rb
+import rombus.algorithms as algorithms
 import rombus.core as core
-from rombus.importer import ImportFromStringError, import_from_string
-from rombus.misc import *
+from rombus.importer import import_from_string
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 FLEX_CONTEXT_SETTINGS = dict(
@@ -96,7 +90,7 @@ def make_empirical_interpolant(ctx):
     RB = np.load("RB_matrix.npy")
 
     RB = RB[0 : len(RB)]
-    eim = rb.algorithms.StandardEIM(RB.shape[0], RB.shape[1])
+    eim = algorithms.StandardEIM(RB.shape[0], RB.shape[1])
 
     eim.make(RB)
 

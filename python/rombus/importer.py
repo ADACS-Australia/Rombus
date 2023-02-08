@@ -1,7 +1,8 @@
-# This code is taken from the Uvicorn codebase: https://github.com/encode/uvicorn
+# This code has been copied from the Uvicorn codebase: https://github.com/encode/uvicorn
 # (commit: d613cbea388bafafb6f642077c035ed137deea61)
 #
-# Copyright © 2017-present, [Encode OSS Ltd](https://www.encode.io/). All rights reserved.
+# Copyright © 2017-present, [Encode OSS Ltd](https://www.encode.io/).
+# All rights reserved.
 
 import importlib
 from typing import Any

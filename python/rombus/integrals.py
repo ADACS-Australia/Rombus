@@ -9,13 +9,11 @@ import numpy as np
 from .training import TrainingTools
 
 
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 def rate_to_num(a, b, rate):
     """Convert sample rate to sample numbers in [a,b]"""
     return np.floor(float(b - a) * rate) + 1
 
 
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 def num_to_rate(a, b, num):
     """Convert sample numbers in [a,b] to sample rate"""
     return (num - 1.0) / np.float(b - a)
@@ -23,8 +21,6 @@ def num_to_rate(a, b, num):
 
 ##############################################
 class Quadratures(TrainingTools):
-
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def __init__(self):
         TrainingTools.__init__(self)
         self.switch_dict = {
@@ -36,21 +32,24 @@ class Quadratures(TrainingTools):
             "chebyshev-gauss-lobatto": self.chebyshev_gauss_lobatto,
             "legendre": self.legendre,
             "legendre-gauss-lobatto": self.legendre_gauss_lobatto,
-            #'roq': self.roq
+            # 'roq': self.roq
         }
         self.options = self.switch_dict.keys()
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def __call__(self, args, quad_type):  # , multidomainQ=False):
 
         dim = np.shape(args[:-1])
         num_or_rate = args[-1]
 
-        # Check that the number of domains equals to the number of samples/sample rates specified
+        # Check that the number of domains equals to the
+        #   number of samples/sample rates specified
         if type(num_or_rate) == list:
             if len(num_or_rate) != dim[0] - 1:
                 raise Exception(
-                    "Expecting equal number of intervals and number of samples/sample rates."
+                    (
+                        "Expecting the numbers of intervals and "
+                        "samples/sample rates to be equal."
+                    )
                 )
 
         # Check how many quadrature rules are specified
@@ -58,7 +57,10 @@ class Quadratures(TrainingTools):
             type_quad_type = "list"
             if len(quad_type) != len(num_or_rate):
                 raise Exception(
-                    "Expecting equal number of intervals and specified quadrature rules."
+                    (
+                        "Expecting the numbers of intervals and "
+                        "specified quadrature rules to be equal."
+                    )
                 )
         else:
             type_quad_type = "str"
@@ -111,7 +113,6 @@ class Quadratures(TrainingTools):
 
         return ans
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def riemann_num(self, a, b, n):
         """
         Uniformly sampled array using Riemann quadrature rule
@@ -132,7 +133,6 @@ class Quadratures(TrainingTools):
         weights = np.ones(n, dtype="double")
         return [nodes, (b - a) / (n - 1.0) * weights]
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def riemann_rate(self, a, b, rate):
         """
         Uniformly sampled array using Riemann quadrature rule
@@ -152,7 +152,6 @@ class Quadratures(TrainingTools):
         n = rate_to_num(a, b, rate)
         return self.riemann_num(a, b, n)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def trapezoidal_num(self, a, b, n):
         """
         Uniformly sampled array using trapezoidal quadrature rule
@@ -175,7 +174,6 @@ class Quadratures(TrainingTools):
         weights[-1] /= 2.0
         return [nodes, weights * (b - a) / (n - 1.0)]
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def trapezoidal_rate(self, a, b, rate):
         """
         Uniformly sampled array using trapezoidal quadrature rule
@@ -195,7 +193,6 @@ class Quadratures(TrainingTools):
         n = rate_to_num(a, b, rate)
         return self.trapezoidal_num(a, b, n)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def chebyshev(self, a, b, n):
         """
         Uniformly sampled array using Chebyshev-Gauss quadrature rule
@@ -222,7 +219,6 @@ class Quadratures(TrainingTools):
         weights = np.pi / (num + 1.0) * np.sqrt(1.0 - nodes**2)
         return [nodes * (b - a) / 2.0 + (b + a) / 2.0, weights * (b - a) / 2.0]
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def chebyshev_gauss_lobatto(self, a, b, n):
         """
         Uniformly sampled array using Chebyshev-Gauss-Lobatto quadrature rule
@@ -246,12 +242,10 @@ class Quadratures(TrainingTools):
         weights[-1] /= 2.0
         return [nodes * (b - a) / 2.0 + (b + a) / 2.0, weights * (b - a) / 2.0]
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def legendre(self, a, b, num):
         raise Exception("Legendre Gauss quadrature rule is not yet implemented.")
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def legendre_gauss_lobatto(self, a, b, num):
         raise Exception(
             "Legendre Gauss-Lobatto quadrature rule is not yet implemented."
@@ -259,62 +253,57 @@ class Quadratures(TrainingTools):
         pass
 
 
-# 	#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# 	def roq(self, x, w, eim_indices, B):
-# 		"""Reduced-order quadrature rule
+#     def roq(self, x, w, eim_indices, B):
+#         """Reduced-order quadrature rule
 #
-# 		Input
-# 		-----
-# 		x 			-- original quadrature nodes (e.g., Chebyshev)
-# 		w 			-- original quadrature weights
-# 		eim_indices	-- array indices of empirical interpolation nodes
-# 		B 			-- empirical interpolant operator, `B`
+#         Input
+#         -----
+#         x             -- original quadrature nodes (e.g., Chebyshev)
+#         w             -- original quadrature weights
+#         eim_indices    -- array indices of empirical interpolation nodes
+#         B             -- empirical interpolant operator, `B`
 #
-# 		Returns
-# 		-------
-# 		nodes 	-- reduced-order quadrature nodes
-# 		weights -- reduced-order quadrature weights
+#         Returns
+#         -------
+#         nodes     -- reduced-order quadrature nodes
+#         weights -- reduced-order quadrature weights
 #
-# 		Examples
-# 		--------
-# 		Let x, w be 20 Chebyshev Gauss nodes and weights over the interval
-# 		[10, 100] from
+#         Examples
+#         --------
+#         Let x, w be 20 Chebyshev Gauss nodes and weights over the interval
+#         [10, 100] from
 #
-# 		  >>> qu = rp.Quadratures()
+#           >>> qu = rp.Quadratures()
 #
-# 		  >>> x, w = qu([10, 100, 20], 'chebyshev')
+#           >>> x, w = qu([10, 100, 20], 'chebyshev')
 #
-# 		If `B` is the empirical interpolant operator so that the empirical
-# 		interpolant acting on a function `h` is I[h] = \sum_{i=1}^m B_i*h_i
-# 		and `inds` are the array indices associated with the empirical
-# 		interpolation nodes then
+#         If `B` is the empirical interpolant operator so that the empirical
+#         interpolant acting on a function `h` is I[h] = \sum_{i=1}^m B_i*h_i
+#         and `inds` are the array indices associated with the empirical
+#         interpolation nodes then
 #
-# 		  >>> roq_x, roq_w = rp.Quadratures()(x, w, inds, B)
+#           >>> roq_x, roq_w = rp.Quadratures()(x, w, inds, B)
 #
-# 		gives the reduced-order quadrature nodes (`roq_x`) and weights
-# 		(`roq_w`).
+#         gives the reduced-order quadrature nodes (`roq_x`) and weights
+#         (`roq_w`).
 #
-# 		"""
+#         """
 #
-# 		nodes = x[eim_indices]
-# 		weights = np.dot(B, w)
-# 		return [nodes, weights]
+#         nodes = x[eim_indices]
+#         weights = np.dot(B, w)
+#         return [nodes, weights]
 
 
 ##############################################
 class Real:
-
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def __init__(self, args, quad_type="trapezoidal-num"):
         self.quad_type = quad_type
         self.nodes, self.weights = Quadratures()(args, quad_type)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def integral(self, h):
         """Integral of a function"""
         return np.dot(self.weights, np.real(h))
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def dot(self, h1, h2):
         """Dot product of two functions"""
         dim = np.shape(h1)
@@ -327,25 +316,21 @@ class Real:
                 self.weights, np.sum(h1real[ii] * h2real[ii] for ii in range(dim[0]))
             )
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def norm(self, h):
         """Norm of function"""
         hreal = np.real(h)
         return np.sqrt(np.real(self.dot(hreal, hreal)))
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def normalize(self, h):
         """Normalize a function"""
         return h / self.norm(h)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def match(self, h1, h2):
         """Match integral"""
         h1n = self.normalize(h1)
         h2n = self.normalize(h2)
         return np.real(self.dot(h1n, h2n))
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def mismatch(self, h1, h2):
         """Mismatch integral (1-match)"""
         return 1.0 - self.match(h1, h2)
@@ -353,18 +338,14 @@ class Real:
 
 ##############################################
 class Complex:
-
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def __init__(self, args, quad_type="trapezoidal-num"):
         self.quad_type = quad_type
         self.nodes, self.weights = Quadratures()(args, quad_type)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def integral(self, h):
         """Integral of a function"""
         return np.dot(self.weights, h)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def dot(self, h1, h2):
         """Dot product of two functions"""
         dim = np.shape(h1)
@@ -375,24 +356,20 @@ class Complex:
                 np.sum(np.conj(h1[ii]) * h2[ii] for ii in range(dim[0]))
             )
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def norm(self, h):
         """Norm of function"""
         return np.sqrt(np.real(self.dot(h, h)))
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def normalize(self, h):
         """Normalize a function"""
         return h / self.norm(h)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def match(self, h1, h2):
         """Match integral"""
         h1n = self.normalize(h1)
         h2n = self.normalize(h2)
         return np.real(self.dot(h1n, h2n))
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def mismatch(self, h1, h2):
         """Mismatch integral (1-match)"""
         return 1.0 - self.match(h1, h2)
@@ -402,7 +379,6 @@ class Complex:
 class InnerProduct(Real, Complex):
     """Integrals for computing inner products and norms of functions"""
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def __init__(self, args, quad_type="trapezoidal-num"):
 
         Real.__init__(self, args, quad_type)
@@ -417,47 +393,38 @@ class InnerProduct(Real, Complex):
         }
         self.options = self.switch_dict.keys()
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def __call__(self, h1, h2, inner_type):
         return self.dot(h1, h2, inner_type)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def integral(self, h, inner_type):
         """Integral of a function"""
         return self.switch_dict[inner_type].integral(h)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def dot(self, h1, h2, inner_type):
         """Dot product of two functions"""
         return self.switch_dict[inner_type].dot(h1, h2)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def norm(self, h, inner_type):
         """Norm of function"""
         return np.sqrt(np.real(self.dot(h, h, inner_type)))
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def normalize(self, h, inner_type):
         """Normalize a function"""
         return h / self.norm(h, inner_type)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def match(self, h1, h2, inner_type):
         """Match integral"""
         return self.switch_dict[inner_type].match(h1, h2)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def mismatch(self, h1, h2, inner_type):
         """Mismatch integral (1-match)"""
         return self.switch_dict[inner_type].mismatch(h1, h2)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def Linfty(self, h):
         """L-infinity norm"""
         # FIXME: h cannot be a multi-dim array
         return np.max(np.abs(h))
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def Ln(self, h, n):
         """L-n norm"""
         # FIXME: h cannot be a multi-dim array
@@ -465,13 +432,11 @@ class InnerProduct(Real, Complex):
             return (np.dot(self.weights, np.abs(h) ** n)) ** (1.0 / n)
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def L2(self, h):
         """L-2 norm"""
         # FIXME: h cannot be a multi-dim array
         return self.Ln(h, 2)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def _test_monomial(self, n=0):
         """Test integration rule by integrating the monomial x**n"""
         ans = self.integral(self.nodes**n, "real")

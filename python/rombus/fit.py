@@ -1,25 +1,24 @@
 # --- fit.py ---
 
 """
-	Classes and functions for fitting functions at the greedy-selected parameter values.
+    Classes and functions for fitting functions at the greedy-selected parameter values.
 """
 
 
 import numpy as np
-import scipy.optimize as opt
 from scipy.interpolate import splev, splrep
 
 # from scipy.optimize import curve_fit
 from scipy.optimize import leastsq
 
-from . import eim, lib
+from rombus import lib
 
 ##############################################
 # The following three functions (_general_function, _weighted_general_function,
 # curve_fit) are from scipy.optimize. I have changed the error handling here
 # so that curve_fit returns the parameters found, even if they are not optimal.
-# The original code raises an exception and aborts the program. Using a `try` and `except`
-# pair does not seem to retain the (suboptimal) fit parameters.
+# The original code raises an exception and aborts the program. Using a `try`
+# and `except` pair does not seem to retain the (suboptimal) fit parameters.
 
 
 def _general_function(params, xdata, ydata, function):
@@ -102,7 +101,7 @@ def curve_fit(f, xdata, ydata, p0=None, sigma=None, **kw):
             p0 = [1.0] * (len(args) - 1)
 
     if np.isscalar(p0):
-        p0 = array([p0])
+        p0 = np.array([p0])
 
     args = (xdata, ydata, f)
     if sigma is None:
@@ -142,7 +141,6 @@ def curve_fit(f, xdata, ydata, p0=None, sigma=None, **kw):
 class Spline1d:
     """Class for building one dimensional spline interpolants"""
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def __init__(self, x, y, k=3):
         """Initialize Spline1d class. Builds 1d spline interpolant
         of degree k from x and y data.
@@ -171,11 +169,9 @@ class Spline1d:
 
         self.fitparams = [self.knots, self.coeffs, self.degree]
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def __call__(self, p, der=0):
         return self.fit(p, der)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def fit(self, p, der=0):
         if len(self.dim) == 1:
             return splev(p, self.fitparams, der)
@@ -190,8 +186,6 @@ class Spline1d:
 
 ##############################################
 class Polynomial:
-
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def __init__(self, x, y, deg=3):
 
         # Map x to reference interval, [-1,1]
@@ -220,7 +214,6 @@ class Polynomial:
             raise Exception("Expected a non-empty array.")
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def map_poly_coeffs(self, coeffs, x, a, b):
         """Map polynomial coefficients from p(x) to that on the interval [a,b]"""
 
@@ -243,11 +236,9 @@ class Polynomial:
             ::-1
         ]  # Reverse order of polynomial coefficients for use with np.polyval
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def __call__(self, p):
         return self.fit(p)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def fit(self, p):
         if len(self.shape) == 1:
             return np.polyval(self.fitparams, p)
@@ -259,8 +250,6 @@ class Polynomial:
 
 ##############################################
 class UserDefined:
-
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def __init__(self, x, y, fn, p0=None, maxfev=1000):
         self.shape = y.shape
         self.fn = fn
@@ -275,11 +264,9 @@ class UserDefined:
             raise Exception("Expected a non-empty array.")
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def __call__(self, p):
         return self.fit(p)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def fit(self, p):
         if len(self.shape) == 1:
             return self.fn(p, *self.fitparams)
@@ -292,8 +279,6 @@ class UserDefined:
 ##############################################
 # class Surrogate(Spline1d, Polynomial, UserDefined, eim.EmpiricalInterpolation):
 class Surrogate(Spline1d, Polynomial, UserDefined):
-
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def __init__(self, args, fit_type):
         # eim.EmpiricalInterpolation.__init__(self)
 
@@ -307,10 +292,8 @@ class Surrogate(Spline1d, Polynomial, UserDefined):
             UserDefined.__init__(self, *args)
             self.fit = UserDefined(*args).fit
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def __call__(self, p, B):
         return eval(p, B)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def eval(self, p, B):
         return np.dot(self.fit(p), B)

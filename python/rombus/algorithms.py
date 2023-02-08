@@ -15,18 +15,15 @@ import time
 
 import numpy as np
 
-from . import lib
-from .eim import *
-from .fit import Spline1d
-from .greedy import *
+import rombus.eim as eim
+import rombus.greedy as greedy
+import rombus.lib as lib
 
 
 ##############################################
-class Basis(IteratedModifiedGramSchmidt):
-
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+class Basis(greedy.IteratedModifiedGramSchmidt):
     def __init__(self, hs, inner, inner_type, normsQ=False, dtype="complex"):
-        IteratedModifiedGramSchmidt.__init__(self, inner, inner_type)
+        greedy.IteratedModifiedGramSchmidt.__init__(self, inner, inner_type)
 
         self.Nbasis, self.Nquads = np.shape(hs)
         self.functions = hs
@@ -38,7 +35,6 @@ class Basis(IteratedModifiedGramSchmidt):
         self.basis = lib.malloc(dtype, self.Nbasis, self.Nquads)
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def iter(self, step, h, a=0.5, max_iter=3):
         ans = self.add_basis(h, self.basis[:step], a=a, max_iter=max_iter)
 
@@ -49,7 +45,6 @@ class Basis(IteratedModifiedGramSchmidt):
 
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def make(self, a=0.5, max_iter=3, timerQ=False):
         """Find the corresponding orthonormal set of basis functions."""
 
@@ -76,82 +71,77 @@ class Basis(IteratedModifiedGramSchmidt):
 ##############################################
 # class MakeRS(ReducedSpline1d, Spline1d):
 #
-# 	#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# 	def __init__(self, x, deg=3, dtype='double'):
-# 		ReducedSpline1d.__init__(self)
-# 		self.x = np.sort(x)
-# 		self.deg = deg
-# 		self.nodes = np.zeros(len(x), dtype='double')
-# 		self.values = np.zeros(len(x), dtype=dtype)
-# 		pass
+#     def __init__(self, x, deg=3, dtype='double'):
+#         ReducedSpline1d.__init__(self)
+#         self.x = np.sort(x)
+#         self.deg = deg
+#         self.nodes = np.zeros(len(x), dtype='double')
+#         self.values = np.zeros(len(x), dtype=dtype)
+#         pass
 #
-# 	#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# 	def seed(self, x0, fn, args=None):
-# 		self.xmax = self.x.max()
-# 		self.nodes[0] = x0
-# 		self.values[0] = lib.fneval(x0, fn, args=args)
-# 		pass
+#     def seed(self, x0, fn, args=None):
+#         self.xmax = self.x.max()
+#         self.nodes[0] = x0
+#         self.values[0] = lib.fneval(x0, fn, args=args)
+#         pass
 #
-# 	#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# 	def iter(self, step, delta, x, fn, args=None):
-# 		if x+delta < self.xmax:
-# 			self.nodes[step+1] = x+delta
-# 			self.values[step+1] = lib.fneval(x+delta, fn, args=args)
-# 			return x+delta, step+1
-# 		else:
-# 			self.nodes[step+1] = self.xmax
-# 			self.values[step+1] = lib.fneval(self.xmax, fn, args=args)
-# 			return self.xmax, step+1
-# 		pass
+#     def iter(self, step, delta, x, fn, args=None):
+#         if x+delta < self.xmax:
+#             self.nodes[step+1] = x+delta
+#             self.values[step+1] = lib.fneval(x+delta, fn, args=args)
+#             return x+delta, step+1
+#         else:
+#             self.nodes[step+1] = self.xmax
+#             self.values[step+1] = lib.fneval(self.xmax, fn, args=args)
+#             return self.xmax, step+1
+#         pass
 #
-# 	#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# 	def make(self, tol, fn, args=None):
+#     def make(self, tol, fn, args=None):
 #
-# 		self.seed(self.x.min(), fn, args=args)
+#         self.seed(self.x.min(), fn, args=args)
 #
-# 		#xsorted = np.sort(self.x)
-# 		ctr = 0
-# 		xx = self.nodes[0]
-# 		while xx <= self.xmax:
+#         #xsorted = np.sort(self.x)
+#         ctr = 0
+#         xx = self.nodes[0]
+#         while xx <= self.xmax:
 #
-# 			deriv_n = self.autodiff(xx, fn, n=self.deg+1, args=args)
-# 			delta = self.delta(tol, deriv_n, self.deg+1)
+#             deriv_n = self.autodiff(xx, fn, n=self.deg+1, args=args)
+#             delta = self.delta(tol, deriv_n, self.deg+1)
 #
-# 			xx, ctr = self.iter(ctr, delta, xx, fn, args=args)
+#             xx, ctr = self.iter(ctr, delta, xx, fn, args=args)
 #
-# 			if xx+delta > self.xmax:
-# 				break
+#             if xx+delta > self.xmax:
+#                 break
 #
-# 		self.trim(ctr+1)
-# 		self.size = len(self.nodes)
+#         self.trim(ctr+1)
+#         self.size = len(self.nodes)
 #
-# 		# Make the spline interpolant
-# 		spline = Spline1d(self.nodes, self.values, k=self.deg)
-# 		self.fit = spline.fit
-# 		self.fitparams = spline.fitparams
-# 		pass
+#         # Make the spline interpolant
+#         spline = Spline1d(self.nodes, self.values, k=self.deg)
+#         self.fit = spline.fit
+#         self.fitparams = spline.fitparams
+#         pass
 #
-# 	#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# 	def trim(self, num):
-# 		"""Trim zeros from remaining entries"""
-# 		self.nodes = self.nodes[:num+1]
-# 		self.values = self.values[:num+1]
-# 		pass
+#     def trim(self, num):
+#         """Trim zeros from remaining entries"""
+#         self.nodes = self.nodes[:num+1]
+#         self.values = self.values[:num+1]
+#         pass
 
 
 ##############################################
-class StandardRB(ReducedBasis, IteratedModifiedGramSchmidt):
+class StandardRB(greedy.ReducedBasis, greedy.IteratedModifiedGramSchmidt):
     """Class for standard reduced basis greedy algorithm.
 
     Input
     -----
-       Nbasis 	  -- number of basis functions
-       Npoints 	  -- number of training set points
-       Nquads 	  -- number of quadrature nodes used for inner products
-       inner 	  -- method of InnerProduct instance
+       Nbasis       -- number of basis functions
+       Npoints       -- number of training set points
+       Nquads       -- number of quadrature nodes used for inner products
+       inner       -- method of InnerProduct instance
        inner_type -- type of inner product (e.g., 'complex')
-       norms 	  -- array of training set function norms (default None)
-       dtype 	  -- data type of functions (default 'complex')
+       norms       -- array of training set function norms (default None)
+       dtype       -- data type of functions (default 'complex')
 
     Functions
     ---------
@@ -196,7 +186,6 @@ class StandardRB(ReducedBasis, IteratedModifiedGramSchmidt):
 
     """
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def __init__(
         self,
         Nbasis,
@@ -208,8 +197,8 @@ class StandardRB(ReducedBasis, IteratedModifiedGramSchmidt):
         norms=None,
         dtype="complex",
     ):
-        ReducedBasis.__init__(self, inner, inner_type)
-        IteratedModifiedGramSchmidt.__init__(self, inner, inner_type)
+        greedy.ReducedBasis.__init__(self, inner, inner_type)
+        greedy.IteratedModifiedGramSchmidt.__init__(self, inner, inner_type)
 
         if norms is None:
             self.norms = np.ones(Npoints, dtype="double")
@@ -221,7 +210,6 @@ class StandardRB(ReducedBasis, IteratedModifiedGramSchmidt):
         self.malloc(Nbasis, Npoints, Nquads, Nmodes=Nmodes, dtype=dtype)
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def seed(self, index_seed, trsp):
         """Seed the greedy algorithm.
 
@@ -231,8 +219,8 @@ class StandardRB(ReducedBasis, IteratedModifiedGramSchmidt):
 
         Input
         -----
-        index_seed 	-- array index for seed point in training set
-        trsp 		-- the training space of functions
+        index_seed     -- array index for seed point in training set
+        trsp         -- the training space of functions
 
         Examples
         --------
@@ -251,7 +239,6 @@ class StandardRB(ReducedBasis, IteratedModifiedGramSchmidt):
         self.alpha[0] = self.alpha_arr(self.basis[0], trsp)
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def iter(self, step, errs, trsp):
         """One iteration of standard reduced basis greedy algorithm.
 
@@ -283,17 +270,16 @@ class StandardRB(ReducedBasis, IteratedModifiedGramSchmidt):
         self.alpha[step + 1] = self.alpha_arr(self.basis[step + 1], trsp)
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def make(self, index_seed, trsp, tol, verbose=True, timerQ=False):
         """Make a reduced basis using the standard greedy algorithm.
 
         Input
         -----
-        index_seed 	-- array index for seed point in training set
-        trsp 		-- the training space of functions
-        tol			-- tolerance that terminates the greedy algorithm
-        verbose		-- print projection errors to screen (default True)
-        timer		-- print elapsed time (default False)
+        index_seed     -- array index for seed point in training set
+        trsp         -- the training space of functions
+        tol            -- tolerance that terminates the greedy algorithm
+        verbose        -- print projection errors to screen (default True)
+        timer        -- print elapsed time (default False)
 
         Examples
         --------
@@ -344,11 +330,9 @@ class StandardRB(ReducedBasis, IteratedModifiedGramSchmidt):
         self.trim(self.size)
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def projection(self, h):
         return self.rb_project(h, self.basis)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def trim(self, num):
         """Trim zeros from remaining entries"""
         self.errors = self.errors[:num]
@@ -359,18 +343,15 @@ class StandardRB(ReducedBasis, IteratedModifiedGramSchmidt):
 
 
 ##############################################
-class StandardEIM(EmpiricalInterpolation):
-
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+class StandardEIM(eim.EmpiricalInterpolation):
     def __init__(self, Nbasis, Nquads, Nmodes=1, dtype="complex"):
-        EmpiricalInterpolation.__init__(self)
+        eim.EmpiricalInterpolation.__init__(self)
 
         # Allocate memory for numpy arrays
         self.malloc(Nbasis, Nquads, Nmodes=Nmodes, dtype=dtype)
         self.modes = Nmodes
         self.quads = Nquads
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def seed(self, e):
         """Seed the algorithm"""
         self.indices[0] = np.argmax(np.abs(e))
@@ -378,7 +359,6 @@ class StandardEIM(EmpiricalInterpolation):
         self.invV[:1, :1] = self.next_invV_col(self.R[:1], self.indices[:1])
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def iter(self, step, e):
         """One iteration in the empirical interpolation greedy algorithm"""
 
@@ -396,7 +376,6 @@ class StandardEIM(EmpiricalInterpolation):
         )
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def make(self, basis, verbose=True, timerQ=False):
         """Make an empirical interpolant using the standard greedy algorithm"""
 
@@ -421,25 +400,22 @@ class StandardEIM(EmpiricalInterpolation):
 
         # Compute interpolant matrix 'B'
         # if flag == 1:
-        # 	self.size = ctr
+        #     self.size = ctr
         # else:
-        # 	self.size = ctr+2
+        #     self.size = ctr+2
         # self.trim(ctr+1)
         self.trim(ctr + 2)
         self.make_interpolant()
         self.size = len(self.indices)
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def make_interpolant(self):
         self.B = self.eim_interpolant(self.invV, self.R)
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def interpolate(self, h):
         return self.eim_interpolate(h, self.indices, self.B)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def trim(self, num):
         """Trim zeros from remaining entries"""
         if num > 0:
@@ -451,9 +427,7 @@ class StandardEIM(EmpiricalInterpolation):
 
 
 ##############################################
-class StandardRBEIM(ReducedBasis, EmpiricalInterpolation):
-
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+class StandardRBEIM(greedy.ReducedBasis, eim.EmpiricalInterpolation):
     def __init__(
         self,
         Nbasis,
@@ -476,23 +450,22 @@ class StandardRBEIM(ReducedBasis, EmpiricalInterpolation):
             dtype=dtype,
         )
         self.eim = StandardEIM(Nbasis, Nquads, dtype=dtype)
-        ReducedBasis.__init__(self, inner, inner_type)
-        EmpiricalInterpolation.__init__(self)
+        greedy.ReducedBasis.__init__(self, inner, inner_type)
+        eim.EmpiricalInterpolation.__init__(self)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def seed(self, rb_index_seed, trsp):
         """Seed the algorithms"""
         self.rb.seed(rb_index_seed, trsp)
         self.eim.seed(self.rb.basis[0])
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def iter(self, step, trsp, e):
-        """One iteration in the reduced basis and empirical interpolation greedy algorithms"""
+        """One iteration in the reduced basis and empirical
+        interpolation greedy algorithms
+        """
         self.rb.iter(step, trsp)
         self.eim.iter(step, e)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def make(self, rb_index_seed, trsp, tol, verbose=True):
         """Make a reduced basis and an empirical interpolant simultaneously"""
 

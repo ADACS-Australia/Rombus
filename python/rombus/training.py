@@ -17,7 +17,6 @@ class TrainingTools:
     def __init__(self):
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def equal_lens(self, *arrs):
         lens = map(len, arrs)
         if len(set(lens)) > 1:
@@ -25,13 +24,11 @@ class TrainingTools:
         else:
             return True
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def check_lens(self, *arrs):
         if not self.equal_lens(*arrs):
             raise Exception("Unequal array lengths")
         pass
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def make_arrs(self, pmin, pmax, Nmu):
         """Make list of 1d arrays for each given parameter range"""
         if np.shape(Nmu):
@@ -39,7 +36,6 @@ class TrainingTools:
         else:
             return [np.linspace(pmin[jj], pmax[jj], Nmu) for jj in range(len(pmin))]
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def meshgrid2(self, *arrs):
         """Multi-dimensional version of numpy's meshgrid"""
         arrs = tuple(reversed(arrs))
@@ -61,7 +57,6 @@ class TrainingTools:
 
         return ans[::-1]
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def meshgrid3(self, *arrs):
         """Multi-dimensional version of numpy's meshgrid,
         excluding symmetric tuples from the square grid"""
@@ -85,18 +80,15 @@ class TrainingTools:
 
         return ans[::-1]
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def tuple_to_vstack(self, arr):
         return np.vstack(map(np.ravel, tuple(arr)))
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def rescale(self, x):
         """Scale [a,b] to [0,1]"""
         a = x[0]
         b = x[-1]
         return (x - a) / (b - a)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def invrescale(self, x, a, b):
         """Scale [0,1] to [a,b]"""
         if float(x[0]) != 0.0 or float(x[-1]) != 1.0:
@@ -119,26 +111,24 @@ class Uniform(TrainingTools):
     def __call__(self, params, training_type):
         return self.switch_dict[training_type](*params)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def oned(self, pmin, pmax, Nmu):
         """Uniformly spaced 1d array"""
         return np.linspace(pmin, pmax, num=Nmu)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def oned_constrained(self, pmin, pmax, Nmu):
         """Uniformly spaced 1d array satisfying a constraint"""
         arrs = self.make_arrs(pmin, pmax, Nmu)
         return self.tuple_to_vstack(arrs)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def grid(self, pmin, pmax, Nmu):
         """Uniformly spaced n-dimensional array"""
         arrs = self.make_arrs(pmin, pmax, Nmu)
         return self.tuple_to_vstack(self.meshgrid2(*arrs))
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def sym_grid(self, pmin, pmax, Nmu):
-        """Uniformly spaced n-dimensional array with symmetric tuples removed from square grid"""
+        """Uniformly spaced n-dimensional array with
+        symmetric tuples removed from square grid
+        """
         arrs = self.make_arrs(pmin, pmax, Nmu)
         if np.shape(Nmu):
             if len(set(Nmu)) > 1:
@@ -158,7 +148,6 @@ class Random(TrainingTools):
     def __call__(self, params, training_type):
         return self.switch_dict[training_type](*params)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def uniform(self, pmin, pmax, Nmu):
         if np.shape(pmin):
             lens = map(len, [pmin, pmax])
@@ -173,7 +162,6 @@ class Random(TrainingTools):
                 [[random.uniform(pmin, pmax)] for jj in range(Nmu)]
             )
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def nonuniform(self):
         pass
 
@@ -188,14 +176,12 @@ class NonUniform(TrainingTools):
     def __call__(self, fn, params, training_type):
         return self.switch_dict[training_type](fn, *params)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def oned(self, fn, pmin, pmax, Nmu):
         """Nonuniform 1d training space made from an input function"""
         x = np.linspace(pmin, pmax, num=Nmu)
         u = fn(self.rescale(x))
         return self.invrescale(u, pmin, pmax)
 
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     def oned_constrained(self, fn, pmin, pmax, Nmu):
         """Nonuniform 1d, constrained training space made from an input function"""
         mu = np.transpose([pmin, pmax, Nmu])
