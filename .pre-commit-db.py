@@ -1,4 +1,4 @@
-DEPENDENCY_MAPPING = {
+{
     "ruff": {
         "repo": "https://github.com/charliermarsh/ruff-pre-commit",
         "rev": "v${rev}",
