@@ -36,6 +36,10 @@ jobs:
     - name: Set project version
       run: poetry version $(git describe --tags --abbrev=0)
 
+    # Install the project (we need some of the tools installed here for liniting etc)
+    - name: Install the project
+      run: poetry install --no-interaction --extras docs
+
     # Enforce code formating standards
     - name: Enforce linting
       run: poetry run ruff .
@@ -50,9 +54,6 @@ jobs:
         poetry lock --check
 
     # Run tests
-    - name: Install the project
-      run: poetry install --no-interaction --extras docs
-
     - name: Generate build
       run: poetry build
 
