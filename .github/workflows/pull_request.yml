@@ -37,18 +37,21 @@ jobs:
       run: poetry version $(git describe --tags --abbrev=0)
 
     # Enforce code formating standards
-    - name: Lint the code
-      run: poetry run flake8 .
+    - name: Enforce linting
+      run: poetry run ruff .
 
-    - name: Check organisation of imports
-      run: poetry run isort .
+    - name: Enforce formating
+      run: poetry run black .
+
+    # Make sure the Poetry project is properly maintained
+    - name: Enforce maintainance of Poetry project
+      run: |
+        poetry check
+        poetry lock --check
 
     # Run tests
     - name: Install the project
       run: poetry install --no-interaction --extras docs
-
-    - name: Check linting
-      run: poetry run black .
 
     - name: Generate build
       run: poetry build

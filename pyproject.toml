@@ -31,12 +31,11 @@ myst-parser = { version = "^0.18.1", optional = true }
 pre-commit = { version = "^3.0.4", optional = true }
 pytest = { version = "^7.0", optional = true }
 black = { version = "^22.10.0", optional = true }
-isort = { version = "^5.12.0", optional = true }
-flake8 = { version = "^6.0.0", optional = true }
+ruff = { version = "^0.0.243", optional = true}
 
 [tool.poetry.extras]
 docs = ["Sphinx", "sphinx-rtd-theme", "myst-parser"]
-dev = ["pre-commit", "pytest", "black", "isort", "flake8"]
+dev = ["pre-commit", "pytest", "black", "ruff"]
 
 [tool.poetry.scripts]
 rombus = "rombus.scripts.cli:cli"
@@ -44,8 +43,21 @@ rombus = "rombus.scripts.cli:cli"
 [tool.pytest.ini_options]
 markers = [ "lalsuite: Tests that require LALSuite to be installed" ]
 
-[tool.isort]
-profile = "black"
+[tool.ruff]
+ignore = []
+line-length = 88
+select = [
+    "E",
+    "F",
+    "W",
+]
+
+# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["E402"]
+
+[tool.ruff.pydocstyle]
+convention = "numpy"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
