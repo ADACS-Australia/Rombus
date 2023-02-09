@@ -1,30 +1,27 @@
+import collections
+import sys
+
 import click
 import numpy as np
-from rombus.misc import *
-import rombus as rb
-import sys
-from mpi4py import MPI
-from tqdm.auto import tqdm
-import matplotlib.pyplot as plt
-from typing import List, Tuple, Dict
 import pylab as plt
-from dataclasses import dataclass, field
-from typing import Dict, Protocol
-from rombus.importer import ImportFromStringError, import_from_string
-import rombus.core as core
-import collections
 
-CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
-FLEX_CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'],ignore_unknown_options=True,allow_extra_args=True)
+import rombus.algorithms as algorithms
+import rombus.core as core
+from rombus.importer import import_from_string
+
+CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
+FLEX_CONTEXT_SETTINGS = dict(
+    help_option_names=["-h", "--help"],
+    ignore_unknown_options=True,
+    allow_extra_args=True,
+)
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
-@click.argument('model', type=str)
+@click.argument("model", type=str)
 @click.pass_context
 def cli(ctx, model):
-    """Perform greedy algorythm operations with Rombus
-
-    """
+    """Perform greedy algorythm operations with Rombus"""
 
     # ensure that ctx.obj exists and is a dict (in case `cli()` is called
     # by means other than the `if` block below)
@@ -35,10 +32,11 @@ def cli(ctx, model):
     model_instance = model_class()
     ctx.obj = model_instance
 
+
 @cli.command(context_settings=CONTEXT_SETTINGS)
-@click.argument('filename_in', type=click.Path(exists=True))
+@click.argument("filename_in", type=click.Path(exists=True))
 @click.pass_context
-def make_reduced_basis(ctx,filename_in):
+def make_reduced_basis(ctx, filename_in):
     """Make reduced basis
 
     FILENAME_IN is the 'greedy points' numpy file to take as input
@@ -48,7 +46,9 @@ def make_reduced_basis(ctx,filename_in):
 
     greedypoints, chunk_counts = core.divide_and_send_data_to_ranks(filename_in)
     my_ts = core.generate_training_set(model, greedypoints)
-    RB_matrix = core.init_basis_matrix(my_ts[0])  # hardcoding 1st waveform to be used to start the basis
+    RB_matrix = core.init_basis_matrix(
+        my_ts[0]
+    )  # hardcoding 1st waveform to be used to start the basis
 
     error_list = []
     error = np.inf
@@ -83,24 +83,23 @@ def make_reduced_basis(ctx,filename_in):
 @cli.command(context_settings=CONTEXT_SETTINGS)
 @click.pass_context
 def make_empirical_interpolant(ctx):
-    """Make empirical interpolant
-    """
+    """Make empirical interpolant"""
 
     model = ctx.obj
 
     RB = np.load("RB_matrix.npy")
-    
-    RB = RB[0:len(RB)]
-    eim = rb.algorithms.StandardEIM(RB.shape[0], RB.shape[1])
-    
+
+    RB = RB[0 : len(RB)]
+    eim = algorithms.StandardEIM(RB.shape[0], RB.shape[1])
+
     eim.make(RB)
-    
+
     domain = model.init_domain()
-    
+
     fnodes = domain[eim.indices]
-    
+
     fnodes, B = zip(*sorted(zip(fnodes, eim.B)))
-    
+
     np.save("B_matrix", B)
     np.save("fnodes", fnodes)
 
@@ -115,19 +114,21 @@ def compare_rom_to_true(ctx):
 
     cli_params = dict()
     for param_i in ctx.args:
-        if not param_i.startswith('-'):
-            res = param_i.split('=')
-            if len(res)==2:
+        if not param_i.startswith("-"):
+            res = param_i.split("=")
+            if len(res) == 2:
                 # NOTE: for now, all parameters are assumed to be floats
-                cli_params[res[0]]=float(res[1])
+                cli_params[res[0]] = float(res[1])
             else:
-                raise click.ClickException(f"Don't know what to do with argument '{param_i}'")
+                raise click.ClickException(
+                    f"Don't know what to do with argument '{param_i}'"
+                )
         else:
             raise click.ClickException(f"Don't know what to do with option '{param_i}'")
 
     model = ctx.obj
 
-    assert collections.Counter(cli_params.keys())==collections.Counter(model.params)
+    assert collections.Counter(cli_params.keys()) == collections.Counter(model.params)
 
     basis = np.load("B_matrix.npy")
     fnodes = np.load("fnodes.npy")
@@ -140,14 +141,15 @@ def compare_rom_to_true(ctx):
     h_nodes = model.compute(params, fnodes)
     h_rom = core.ROM(model, params, fnodes, basis)
 
-    np.save("ROM_diff", np.subtract(h_rom,h_full))
+    np.save("ROM_diff", np.subtract(h_rom, h_full))
 
-    plt.semilogx(domain, h_rom, label='ROM', alpha=0.5, linestyle='--')
-    plt.semilogx(domain, h_full, label='Full model', alpha=0.5)
+    plt.semilogx(domain, h_rom, label="ROM", alpha=0.5, linestyle="--")
+    plt.semilogx(domain, h_full, label="Full model", alpha=0.5)
     plt.scatter(fnodes, h_nodes, s=1)
     plt.legend()
-    plt.savefig("comparison.pdf", bbox_inches='tight')
+    plt.savefig("comparison.pdf", bbox_inches="tight")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     cli(obj={})
     sys.exit()

@@ -2,10 +2,10 @@ name: Bump version in git
 
 on:
   push:
-    branches: 
+    branches:
     - main
 jobs:
-  bump_version:    
+  bump_version:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
