@@ -22,7 +22,7 @@ repos:
     rev: 0.4.0
     hooks:
       - id: sync_with_poetry
-        args: ['--db','.pre-commit-db.py']
+        args: ['--db','.pre-commit-db.json']
 
   # Lint code
   - repo: https://github.com/charliermarsh/ruff-pre-commit
