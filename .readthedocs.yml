@@ -4,20 +4,17 @@ build:
   os: "ubuntu-22.04"
   tools:
     python: "3.11"
-  commands:
-    # Install and set-up Poetry
-    - asdf plugin add poetry
-    - asdf install poetry latest
-    - asdf global poetry latest
-    - poetry config virtualenvs.create false
-    # Install the project (needed by apidoc)
-    - . "$(pwd | rev | sed 's/stuokcehc/svne/' | rev)/bin/activate" && poetry install --without dev -E docs
-    # Generate the API documentation
-    - make apidoc
-    # Build the site
-    - make html
-    # Copy generated files into Read the Docs directory
-    - mkdir --parents _readthedocs/html/
-    - cp --recursive docs/_build/html _readthedocs/html/
+  jobs:
+    pre_create_environment:
+      # Install and set-up Poetry
+      - asdf plugin add poetry
+      - asdf install poetry latest
+      - asdf global poetry latest
+      - poetry config virtualenvs.create false
+    post_install:
+      # Install the project (needed by apidoc)
+      - . "$(pwd | rev | sed 's/stuokcehc/svne/' | rev)/bin/activate" && poetry install --without dev -E docs
+      # Generate the API documentation
+      - make apidoc
 sphinx:
   configuration: docs/conf.py
