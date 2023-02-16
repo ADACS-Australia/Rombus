@@ -12,6 +12,8 @@ build:
       #  https://github.com/python-poetry/poetry/issues/4493
       - pip install pipx
       - export PATH=${PATH}:${HOME}/.local/bin
+      - echo "HOME:"${HOME}
+      - echo "PATH:"${PATH}
       # Install poetry
       - pipx install poetry
       # Tell poetry to not use a virtual environment
