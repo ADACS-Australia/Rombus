@@ -8,6 +8,9 @@ build:
     - mpich # Rombus has a dependency on mpi4py, which needs this
   jobs:
     post_create_environment:
+      # Install pipx; this is needed because of this issue:
+      #  https://github.com/python-poetry/poetry/issues/4493
+      - pip install pipx
       # Install poetry
       - pipx install poetry
       # Tell poetry to not use a virtual environment
