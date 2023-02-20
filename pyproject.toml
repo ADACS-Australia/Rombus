@@ -32,18 +32,18 @@ pre-commit = { version = "^3.0.4", optional = true }
 pytest = { version = "^7.0", optional = true }
 black = { version = "^22.10.0", optional = true }
 ruff = { version = "^0.0.243", optional = true}
-platformdirs = { version = "^3.0.0", optional = true}
-virtualenv = { version = "^20.19.0", optional = true}
 
 [tool.poetry.extras]
 docs = [
    "Sphinx",
    "sphinx-rtd-theme",
    "myst-parser",
-   "platformdirs", # Needed to avoid the following problem: https://github.com/python-poetry/poetry/issues/4493
-   "virtualenv",   # Needed to avoid the following problem: https://github.com/python-poetry/poetry/issues/4493
 ]
-dev = ["pre-commit", "pytest", "black", "ruff"]
+dev = ["pre-commit",
+       "pytest",
+       "black",
+       "ruff",
+]
 
 [tool.poetry.scripts]
 rombus = "rombus.scripts.cli:cli"
