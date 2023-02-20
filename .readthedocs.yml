@@ -13,9 +13,7 @@ build:
       # Tell poetry to not use a virtual environment
       - poetry config virtualenvs.create false
     post_install:
-      # Install dependencies with 'docs' dependency group.  Make sure to keep
-      #   'dev' dependencies to avoid the following problem:
-      #    https://github.com/python-poetry/poetry/issues/4493
+      # Install dependencies with 'docs' dependency group.
       - poetry install -E docs
       # Generate the API documentation
       - make apidoc
