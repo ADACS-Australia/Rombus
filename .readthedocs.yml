@@ -14,7 +14,9 @@ build:
       - poetry config virtualenvs.create false
     post_install:
       # Install dependencies with 'docs' dependency group.
-      - poetry install -E docs
+      #   Installing everything is overkill, but I keep running 
+      #   into this problem if I don't: https://github.com/python-poetry/poetry/issues/4493
+      - poetry install --all-extras 
       # Generate the API documentation
       - make apidoc
 sphinx:
