@@ -32,6 +32,8 @@ pre-commit = { version = "^3.0.4", optional = true }
 pytest = { version = "^7.0", optional = true }
 black = { version = "^22.10.0", optional = true }
 ruff = { version = "^0.0.243", optional = true}
+platformdirs = { version = "^3.0.0", optional = true}
+virtualenv = { version = "^20.19.0", optional = true}
 
 [tool.poetry.extras]
 docs = [
