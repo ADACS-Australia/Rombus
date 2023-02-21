@@ -17,7 +17,7 @@ RANK = COMM.Get_rank()
 
 
 def generate_training_set(model, greedypoints: List[np.ndarray]) -> np.ndarray:
-    """returns a list of waveforms (one for each row in 'greedypoints')"""
+    """returns a list of models (one for each row in 'greedypoints')"""
 
     domain = model.init_domain()
 
@@ -58,17 +58,17 @@ def divide_and_send_data_to_ranks(datafile: str) -> Tuple[List[np.ndarray], Dict
     return greedypoints, chunk_counts
 
 
-def init_basis_matrix(init_waveform):
-    # init the baisis (RB_matrix) with 1 waveform from the training set to start
+def init_basis_matrix(init_model):
+    # init the baisis (RB_matrix) with 1 model from the training set to start
     if RANK == MAIN_RANK:
-        RB_matrix = [init_waveform]
+        RB_matrix = [init_model]
     else:
         RB_matrix = None
     RB_matrix = COMM.bcast(RB_matrix, root=MAIN_RANK)  # share the basis with ALL nodes
     return RB_matrix
 
 
-def add_next_waveform_to_basis(RB_matrix, pc_matrix, my_ts, iter):
+def add_next_model_to_basis(RB_matrix, pc_matrix, my_ts, iter):
     # project training set on basis + get errors
     pc = misc.project_onto_basis(1.0, RB_matrix, my_ts, iter - 1, complex)
     pc_matrix.append(pc)
@@ -97,20 +97,20 @@ def add_next_waveform_to_basis(RB_matrix, pc_matrix, my_ts, iter):
     )  # share the error data with all nodes
     err_rank, err_idx, error = error_data
 
-    # get waveform with the worst error
-    worst_waveform = None
+    # get model with the worst error
+    worst_model = None
     if err_rank == MAIN_RANK:
-        worst_waveform = my_ts[err_idx]  # no need to send
+        worst_model = my_ts[err_idx]  # no need to send
     elif RANK == err_rank:
-        worst_waveform = my_ts[err_idx]
-        COMM.send(worst_waveform, dest=MAIN_RANK)
-    if worst_waveform is None and RANK == MAIN_RANK:
-        worst_waveform = COMM.recv(source=err_rank)
+        worst_model = my_ts[err_idx]
+        COMM.send(worst_model, dest=MAIN_RANK)
+    if worst_model is None and RANK == MAIN_RANK:
+        worst_model = COMM.recv(source=err_rank)
 
-    # adding worst waveform to baisis
+    # adding worst model to baisis
     if RANK == MAIN_RANK:
         # Gram-Schmidt to get the next basis and normalize
-        RB_matrix.append(misc.IMGS(RB_matrix, worst_waveform, iter))
+        RB_matrix.append(misc.IMGS(RB_matrix, worst_model, iter))
 
     # share the basis with ALL nodes
     RB_matrix = COMM.bcast(RB_matrix, root=MAIN_RANK)
@@ -143,17 +143,17 @@ def make_reduced_basis(model, filename_in):
     my_ts = generate_training_set(model, greedypoints)
     RB_matrix = init_basis_matrix(
         my_ts[0]
-    )  # hardcoding 1st waveform to be used to start the basis
+    )  # hardcoding 1st model to be used to start the basis
 
     error_list = []
     error = np.inf
     iter = 1
-    basis_indicies = [0]  # we've used the 1st waveform already
+    basis_indicies = [0]  # we've used the 1st model already
     pc_matrix = []
     if RANK == MAIN_RANK:
         print("Filling basis with greedy-algorithm")
     while error > 1e-14:
-        RB_matrix, pc_matrix, error_data = add_next_waveform_to_basis(
+        RB_matrix, pc_matrix, error_data = add_next_model_to_basis(
             RB_matrix, pc_matrix, my_ts, iter
         )
         err_rnk, err_idx, error = error_data
