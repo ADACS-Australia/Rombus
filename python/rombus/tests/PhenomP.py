@@ -4,7 +4,7 @@ import lal
 import lalsimulation
 import numpy as np
 
-from rombus.core import RombusModel
+from rombus.model import RombusModel
 
 
 class model(RombusModel):

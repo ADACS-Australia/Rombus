@@ -1,55 +1,19 @@
 import sys
-from abc import ABCMeta, abstractmethod
-from collections import namedtuple
 from typing import Dict, List, NamedTuple, Tuple
 
 import numpy as np
-import pylab as plt
 from mpi4py import MPI
 from tqdm.auto import tqdm
 
+import rombus.algorithms as algorithms
 import rombus.misc as misc
+import rombus.plot as plot
 
 MAIN_RANK = 0
 
 COMM = MPI.COMM_WORLD
 SIZE = COMM.Get_size()
 RANK = COMM.Get_rank()
-
-
-class RombusModel(metaclass=ABCMeta):
-    def __init__(self):
-        self.init()
-
-        # Ensure params is a list of strings
-        assert bool(self.params) and all(isinstance(elem, str) for elem in self.params)
-
-        # Ensure that model_dtype is a string
-        assert type(self.model_dtype) == str
-
-        # Create the named tuple that will be used for parameters
-        self.params_dtype = namedtuple("params_dtype", self.params)
-
-    def init(self):
-        pass
-
-    @property
-    @abstractmethod  # make sure this is the inner-most decorator
-    def model_dtype(self):
-        pass
-
-    @property
-    @abstractmethod  # make sure this is the inner-most decorator
-    def params(self):
-        pass
-
-    @abstractmethod  # make sure this is the inner-most decorator
-    def init_domain(self):
-        pass
-
-    @abstractmethod  # make sure this is the inner-most decorator
-    def compute(self, params: np.ndarray, domain) -> np.ndarray:
-        pass
 
 
 def generate_training_set(model, greedypoints: List[np.ndarray]) -> np.ndarray:
@@ -164,34 +128,68 @@ def convert_to_basis_index(rank_number, rank_idx, rank_counts):
     return int(rank_idx + idx_till_err_rank)
 
 
-def plot_errors(err_list):
-    plt.plot(err_list)
-    plt.xlabel("# Basis elements")
-    plt.ylabel("Error")
-    plt.yscale("log")
-    plt.tight_layout()
-    plt.savefig("basis_error.png")
-
-
-def plot_basis(rb_matrix):
-    num_elements = len(rb_matrix)
-    total_frames = 125
-    h_in_one_frame = int(num_elements / total_frames)
-    if h_in_one_frame < 1:
-        h_in_one_frame = 1
-    fig, ax = plt.subplots(total_frames, 1, figsize=(4.5, 2.5 * total_frames))
-    for i in range(total_frames):
-        start_i = int(i * h_in_one_frame)
-        end_i = int(start_i + h_in_one_frame)
-        for h_id in range(start_i, end_i):
-            if end_i < num_elements:
-                h = rb_matrix[h_id]
-                ax[i].plot(h, color=f"C{h_id}", alpha=0.7)
-        ax[i].set_title(f"Basis element {start_i:003}-{end_i:003}")
-    plt.tight_layout()
-    fig.savefig("basis.png")
-
-
 def ROM(model, params: NamedTuple, domain, basis):
     _signal_at_nodes = model.compute(params, domain)
     return np.dot(_signal_at_nodes, basis)
+
+
+def make_reduced_basis(model, filename_in):
+    """Make reduced basis
+
+    FILENAME_IN is the 'greedy points' numpy file to take as input
+    """
+
+    greedypoints, chunk_counts = divide_and_send_data_to_ranks(filename_in)
+    my_ts = generate_training_set(model, greedypoints)
+    RB_matrix = init_basis_matrix(
+        my_ts[0]
+    )  # hardcoding 1st waveform to be used to start the basis
+
+    error_list = []
+    error = np.inf
+    iter = 1
+    basis_indicies = [0]  # we've used the 1st waveform already
+    pc_matrix = []
+    if RANK == MAIN_RANK:
+        print("Filling basis with greedy-algorithm")
+    while error > 1e-14:
+        RB_matrix, pc_matrix, error_data = add_next_waveform_to_basis(
+            RB_matrix, pc_matrix, my_ts, iter
+        )
+        err_rnk, err_idx, error = error_data
+
+        # log and cache some data
+        loop_log(iter, err_rnk, err_idx, error)
+
+        basis_index = convert_to_basis_index(err_rnk, err_idx, chunk_counts)
+        error_list.append(error)
+        basis_indicies.append(basis_index)
+
+        # update iteration count
+        iter += 1
+
+    if RANK == MAIN_RANK:
+        print("\nBasis generation complete!")
+        np.save("RB_matrix", RB_matrix)
+        plot.errors(error_list)
+        plot.basis(RB_matrix)
+
+
+def make_empirical_interpolant(model):
+    """Make empirical interpolant"""
+
+    RB = np.load("RB_matrix.npy")
+
+    RB = RB[0 : len(RB)]
+    eim = algorithms.StandardEIM(RB.shape[0], RB.shape[1])
+
+    eim.make(RB)
+
+    domain = model.init_domain()
+
+    fnodes = domain[eim.indices]
+
+    fnodes, B = zip(*sorted(zip(fnodes, eim.B)))
+
+    np.save("B_matrix", B)
+    np.save("fnodes", fnodes)
