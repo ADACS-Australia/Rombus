@@ -60,7 +60,9 @@ def make_reduced_basis(ctx, filename_in):
     FILENAME_IN is the 'greedy points' numpy file to take as input
     """
 
-    core.make_reduced_basis(ctx.obj, filename_in)
+    greedypoints, chunk_counts = core.read_divide_and_send_data_to_ranks(filename_in)
+
+    core.make_reduced_basis(ctx.obj, greedypoints, chunk_counts)
 
 
 @cli.command(context_settings=CONTEXT_SETTINGS)
@@ -69,6 +71,17 @@ def make_empirical_interpolant(ctx):
     """Make empirical interpolant"""
 
     core.make_empirical_interpolant(ctx.obj)
+
+
+@cli.command(context_settings=CONTEXT_SETTINGS)
+@click.argument("filename_in", type=click.Path(exists=True))
+@click.pass_context
+def generate(ctx, filename_in):
+    """Make empirical interpolant"""
+
+    greedypoints, chunk_counts = core.read_divide_and_send_data_to_ranks(filename_in)
+
+    core.generate(ctx.obj, greedypoints, chunk_counts)
 
 
 @cli.command(context_settings=FLEX_CONTEXT_SETTINGS)

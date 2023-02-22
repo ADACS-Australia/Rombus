@@ -15,11 +15,14 @@ COMM = MPI.COMM_WORLD
 SIZE = COMM.Get_size()
 RANK = COMM.Get_rank()
 
+random = np.random.default_rng()
+
 
 def generate_training_set(model, greedypoints: List[np.ndarray]) -> np.ndarray:
     """returns a list of models (one for each row in 'greedypoints')"""
 
     domain = model.init_domain()
+    print("GP:", greedypoints)
 
     my_ts = np.zeros(shape=(len(greedypoints), len(domain)), dtype=model.model_dtype)
     for ii, params_numpy in enumerate(
@@ -36,10 +39,8 @@ def generate_training_set(model, greedypoints: List[np.ndarray]) -> np.ndarray:
     return my_ts
 
 
-def divide_and_send_data_to_ranks(datafile: str) -> Tuple[List[np.ndarray], Dict]:
+def read_divide_and_send_data_to_ranks(datafile: str) -> Tuple[List[np.ndarray], Dict]:
     # dividing greedypoints into chunks
-    chunks = None
-    chunk_counts = None
     if RANK == MAIN_RANK:
         if datafile.endswith(".npy"):
             greedypoints = np.load(datafile)
@@ -47,7 +48,18 @@ def divide_and_send_data_to_ranks(datafile: str) -> Tuple[List[np.ndarray], Dict
             greedypoints = np.genfromtxt(datafile, delimiter=",")
         else:
             raise Exception
+    else:
+        greedypoints = None
 
+    return divide_and_send_data_to_ranks(greedypoints)
+
+
+def divide_and_send_data_to_ranks(
+    greedypoints: List[np.ndarray],
+) -> Tuple[List[np.ndarray], Dict]:
+    chunks = None
+    chunk_counts = None
+    if RANK == MAIN_RANK:
         chunks = [[] for _ in range(SIZE)]
         for i, chunk in enumerate(greedypoints):
             chunks[i % SIZE].append(chunk)
@@ -133,13 +145,62 @@ def ROM(model, params: NamedTuple, domain, basis):
     return np.dot(_signal_at_nodes, basis)
 
 
-def make_reduced_basis(model, filename_in):
+def generate_random_samples(model, n_samples):
+    samples = []
+    for _ in range(n_samples):
+        new_sample = np.ndarray(len(model.params), dtype=model.model_dtype)
+        for i in range(len(model.params)):
+            new_sample[i] = random.random() * 10.0
+        samples.append(new_sample)
+    return samples
+
+
+def validate_and_refine_basis(
+    model, RB_matrix, selected_greedy_points, tol, N_validations
+):
+
+    # generate validation set by randomly sampling the parameter space
+    # need to think about how to do sampling, but this can be the same function
+    # as the greedy points
+    random_samples = generate_random_samples(model, N_validations)
+    validation_samples, chunk_counts = divide_and_send_data_to_ranks(random_samples)
+
+    my_vs = generate_training_set(model, validation_samples)
+    for i in range(len(my_vs)):
+        proj_error = 1 - np.sum(np.dot(my_vs[i], np.transpose(RB_matrix)))
+        if proj_error > tol:
+            selected_greedy_points.append(validation_samples[i])
+
+    # add the inaccurate points to the original selected greedy
+    # points and remake the basis
+    RB_updated, selected_greedy_points = make_reduced_basis(
+        model, selected_greedy_points, chunk_counts
+    )
+
+    return RB_updated, selected_greedy_points
+
+
+def generate(model, greedypoints, chunk_counts):
+
+    tol = 1e-4
+    N_validations = 10
+    RB, selected_greedy_points = make_reduced_basis(model, greedypoints, chunk_counts)
+    Refined_RB, _ = validate_and_refine_basis(
+        model, RB, selected_greedy_points, tol, N_validations
+    )
+    EI = make_empirical_interpolant(model)
+    np.save("EI", EI)
+    np.save("RB", Refined_RB)
+
+    return 0
+
+
+def make_reduced_basis(model, greedypoints, chunk_counts):
     """Make reduced basis
 
     FILENAME_IN is the 'greedy points' numpy file to take as input
     """
 
-    greedypoints, chunk_counts = divide_and_send_data_to_ranks(filename_in)
     my_ts = generate_training_set(model, greedypoints)
     RB_matrix = init_basis_matrix(
         my_ts[0]
@@ -173,6 +234,9 @@ def make_reduced_basis(model, filename_in):
         np.save("RB_matrix", RB_matrix)
         plot.errors(error_list)
         plot.basis(RB_matrix)
+
+    greedypoints_keep = [greedypoints[i] for i in basis_indicies]
+    return RB_matrix, greedypoints_keep
 
 
 def make_empirical_interpolant(model):
