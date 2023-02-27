@@ -52,12 +52,14 @@ rombus = "rombus.scripts.cli:cli"
 markers = [ "lalsuite: Tests that require LALSuite to be installed" ]
 
 [tool.ruff]
-ignore = []
 line-length = 88
 select = [
     "E",
     "F",
     "W",
+]
+ignore = [
+    "E501", # line length violations (let Black handle this)
 ]
 
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.

@@ -22,7 +22,6 @@ def generate_training_set(model, greedypoints: List[np.ndarray]) -> np.ndarray:
     """returns a list of models (one for each row in 'greedypoints')"""
 
     domain = model.init_domain()
-    print("GP:", greedypoints)
 
     my_ts = np.zeros(shape=(len(greedypoints), len(domain)), dtype=model.model_dtype)
     for ii, params_numpy in enumerate(
@@ -33,8 +32,6 @@ def generate_training_set(model, greedypoints: List[np.ndarray]) -> np.ndarray:
         )
         h = model.compute(params, domain)
         my_ts[ii] = h / np.sqrt(np.vdot(h, h))
-        # TODO: currently stored in RAM but does this need to be saved/cached on each
-        #       compute node's scratch space?
 
     return my_ts
 
@@ -156,7 +153,7 @@ def generate_random_samples(model, n_samples):
 
 
 def validate_and_refine_basis(
-    model, RB_matrix, selected_greedy_points, tol, N_validations
+    model, RB_matrix, selected_greedy_points, tol, N_validations, write_results=True
 ):
 
     # generate validation set by randomly sampling the parameter space
@@ -166,36 +163,44 @@ def validate_and_refine_basis(
     validation_samples, chunk_counts = divide_and_send_data_to_ranks(random_samples)
 
     my_vs = generate_training_set(model, validation_samples)
+    n_added = 0
     for i in range(len(my_vs)):
         proj_error = 1 - np.sum(np.dot(my_vs[i], np.transpose(RB_matrix)))
+        print(f"PE:{proj_error}")
         if proj_error > tol:
             selected_greedy_points.append(validation_samples[i])
+            n_added = n_added + 1
+    if RANK == MAIN_RANK:
+        print(f"Number of samples added: {n_added}")
 
     # add the inaccurate points to the original selected greedy
     # points and remake the basis
     RB_updated, selected_greedy_points = make_reduced_basis(
-        model, selected_greedy_points, chunk_counts
+        model, selected_greedy_points, chunk_counts, write_results=write_results
     )
 
     return RB_updated, selected_greedy_points
 
 
-def generate(model, greedypoints, chunk_counts):
+def refine(model, greedypoints, chunk_counts, tol=1e-4, N_validations=100):
 
-    tol = 1e-4
-    N_validations = 10
-    RB, selected_greedy_points = make_reduced_basis(model, greedypoints, chunk_counts)
-    Refined_RB, _ = validate_and_refine_basis(
-        model, RB, selected_greedy_points, tol, N_validations
+    RB, selected_greedy_points = make_reduced_basis(
+        model, greedypoints, chunk_counts, write_results=False
     )
+    Refined_RB, _ = validate_and_refine_basis(
+        model, RB, selected_greedy_points, tol, N_validations, write_results=False
+    )
+    np.save("RB_matrix", Refined_RB)
+
     EI = make_empirical_interpolant(model)
+
+    # Write results
     np.save("EI", EI)
-    np.save("RB", Refined_RB)
 
     return 0
 
 
-def make_reduced_basis(model, greedypoints, chunk_counts):
+def make_reduced_basis(model, greedypoints, chunk_counts, write_results=True):
     """Make reduced basis
 
     FILENAME_IN is the 'greedy points' numpy file to take as input
@@ -231,9 +236,10 @@ def make_reduced_basis(model, greedypoints, chunk_counts):
 
     if RANK == MAIN_RANK:
         print("\nBasis generation complete!")
-        np.save("RB_matrix", RB_matrix)
-        plot.errors(error_list)
-        plot.basis(RB_matrix)
+        if write_results:
+            np.save("RB_matrix", RB_matrix)
+            plot.errors(error_list)
+            plot.basis(RB_matrix)
 
     greedypoints_keep = [greedypoints[i] for i in basis_indicies]
     return RB_matrix, greedypoints_keep
@@ -251,9 +257,9 @@ def make_empirical_interpolant(model):
 
     domain = model.init_domain()
 
-    fnodes = domain[eim.indices]
+    nodes = domain[eim.indices]
 
-    fnodes, B = zip(*sorted(zip(fnodes, eim.B)))
+    nodes, B = zip(*sorted(zip(nodes, eim.B)))
 
     np.save("B_matrix", B)
-    np.save("fnodes", fnodes)
+    np.save("nodes", nodes)

@@ -51,52 +51,55 @@ def cli(ctx, model):
     ctx.obj = init_model(model)
 
 
-@cli.command(context_settings=CONTEXT_SETTINGS)
-@click.argument("filename_in", type=click.Path(exists=True))
-@click.pass_context
-def make_reduced_basis(ctx, filename_in):
-    """Make reduced basis
-
-    FILENAME_IN is the 'greedy points' numpy file to take as input
-    """
-
-    greedypoints, chunk_counts = core.read_divide_and_send_data_to_ranks(filename_in)
-
-    core.make_reduced_basis(ctx.obj, greedypoints, chunk_counts)
-
-
-@cli.command(context_settings=CONTEXT_SETTINGS)
-@click.pass_context
-def make_empirical_interpolant(ctx):
-    """Make empirical interpolant"""
-
-    core.make_empirical_interpolant(ctx.obj)
-
-
-@cli.command(context_settings=CONTEXT_SETTINGS)
-@click.argument("filename_in", type=click.Path(exists=True))
-@click.pass_context
-def generate(ctx, filename_in):
-    """Make empirical interpolant"""
-
-    greedypoints, chunk_counts = core.read_divide_and_send_data_to_ranks(filename_in)
-
-    core.generate(ctx.obj, greedypoints, chunk_counts)
-
-
 @cli.command(context_settings=FLEX_CONTEXT_SETTINGS)
+@click.argument("parameters", nargs=-1, type=click.UNPROCESSED)
 @click.pass_context
-def compare_rom_to_true(ctx):
-    """Compare computed ROM to input model
+def evaluate(ctx, parameters):
+    """Evaluate a reduced order model and compare it to truth
 
-    FILENAME_IN is the 'greedy points' numpy file to take as input
-    """
+    PARAMETERS is a list of parameter values of the form A=VAL B=VAL ..."""
 
     # Parse the model parameters, which should have been given as arguments
-    model_params = parse_cli_model_params(ctx.args, ctx.obj)
+    model_params = parse_cli_model_params(parameters, ctx.obj)
 
     # Generate plot
     plot.compare_rom_to_true(ctx.obj, model_params)
+
+
+@cli.command(context_settings=CONTEXT_SETTINGS)
+@click.argument("filename_in", type=click.Path(exists=True))
+@click.option(
+    "--do_step",
+    type=click.Choice(["RB", "EI"], case_sensitive=False),
+    default=None,
+    help="Do only one step: RB=reduced basis; EI=empirical interpolant",
+)
+@click.pass_context
+def build(ctx, filename_in, do_step):
+    """Build a reduced order model
+
+    FILENAME_IN is the 'greedy points' numpy or csv file to take as input
+    """
+
+    if not do_step or do_step == "RB":
+        greedypoints, chunk_counts = core.read_divide_and_send_data_to_ranks(
+            filename_in
+        )
+        core.make_reduced_basis(ctx.obj, greedypoints, chunk_counts)
+
+    if not do_step or do_step == "EI":
+        core.make_empirical_interpolant(ctx.obj)
+
+
+@cli.command(context_settings=CONTEXT_SETTINGS)
+@click.argument("filename_in", type=click.Path(exists=True))
+@click.pass_context
+def refine(ctx, filename_in):
+    """Refine parameter sampling to impove a reduced order model"""
+
+    greedypoints, chunk_counts = core.read_divide_and_send_data_to_ranks(filename_in)
+
+    core.refine(ctx.obj, greedypoints, chunk_counts)
 
 
 if __name__ == "__main__":

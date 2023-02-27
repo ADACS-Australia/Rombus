@@ -22,6 +22,7 @@ __pycache__
 .pytest_cache
 .src
 .cache
+.ropeproject
 
 # Pyenv stuff
 .python-version
