@@ -24,14 +24,14 @@ def generate_training_set(model, greedypoints: List[np.ndarray]) -> np.ndarray:
     domain = model.init_domain()
 
     my_ts = np.zeros(shape=(len(greedypoints), len(domain)), dtype=model.model_dtype)
-    for ii, params_numpy in enumerate(
+    for i, params_numpy in enumerate(
         tqdm(greedypoints, desc=f"Generating training set for rank {RANK}")
     ):
         params = model.params_dtype(
             **dict(zip(model.params, np.atleast_1d(params_numpy)))
         )
-        h = model.compute(params, domain)
-        my_ts[ii] = h / np.sqrt(np.vdot(h, h))
+        model_i = model.compute(params, domain)
+        my_ts[i] = model_i / np.sqrt(np.vdot(model_i, model_i))
 
     return my_ts
 
@@ -95,7 +95,7 @@ def add_next_model_to_basis(RB_matrix, pc_matrix, my_ts, iter):
     # gather all errors (below is a list[ rank0_errors, rank1_errors...])
     all_rank_errors = COMM.gather(projection_errors, root=MAIN_RANK)
 
-    # determine  highest error
+    # determine highest error
     if RANK == MAIN_RANK:
         error_data = misc.get_highest_error(all_rank_errors)
         err_rank, err_idx, error = error_data
@@ -116,7 +116,7 @@ def add_next_model_to_basis(RB_matrix, pc_matrix, my_ts, iter):
     if worst_model is None and RANK == MAIN_RANK:
         worst_model = COMM.recv(source=err_rank)
 
-    # adding worst model to baisis
+    # adding worst model to basis
     if RANK == MAIN_RANK:
         # Gram-Schmidt to get the next basis and normalize
         RB_matrix.append(misc.IMGS(RB_matrix, worst_model, iter))
@@ -163,12 +163,15 @@ def validate_and_refine_basis(
     validation_samples, chunk_counts = divide_and_send_data_to_ranks(random_samples)
 
     my_vs = generate_training_set(model, validation_samples)
+
     n_added = 0
-    for i in range(len(my_vs)):
-        proj_error = 1 - np.sum(np.dot(my_vs[i], np.transpose(RB_matrix)))
-        print(f"PE:{proj_error}")
+    RB_transpose = np.transpose(RB_matrix)
+    for i, validation_sample in enumerate(validation_samples):
+        proj_error = 1 - np.sum(np.dot(my_vs[i], RB_transpose))
+        # proj_error = 1 - np.einsum( "ij,ij->i", np.array(np.conjugate(pc_matrix)).T, np.array(pc_matrix).T)
+        print(f"params:{validation_sample} error={proj_error}")
         if proj_error > tol:
-            selected_greedy_points.append(validation_samples[i])
+            selected_greedy_points.append(validation_sample)
             n_added = n_added + 1
     if RANK == MAIN_RANK:
         print(f"Number of samples added: {n_added}")
@@ -190,8 +193,8 @@ def refine(model, greedypoints, chunk_counts, tol=1e-4, N_validations=100):
     Refined_RB, _ = validate_and_refine_basis(
         model, RB, selected_greedy_points, tol, N_validations, write_results=False
     )
-    np.save("RB_matrix", Refined_RB)
 
+    np.save("RB_matrix", Refined_RB)
     EI = make_empirical_interpolant(model)
 
     # Write results
