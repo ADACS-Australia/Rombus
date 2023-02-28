@@ -1,9 +1,12 @@
 import importlib
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
-from typing import Any
+from typing import Any, List
+from tqdm.auto import tqdm
 
 import numpy as np
+
+import rombus.mpi as mpi
 
 
 def init_model(model: str):
@@ -47,6 +50,26 @@ class RombusModel(metaclass=ABCMeta):
     @abstractmethod  # make sure this is the inner-most decorator
     def compute(self, params: np.ndarray, domain) -> np.ndarray:
         pass
+
+
+    def generate_model_set(self, points: List[np.ndarray]) -> np.ndarray:
+        """returns a list of models (one for each row in 'points')"""
+
+        domain = self.init_domain()
+
+        my_ts = np.zeros(shape=(len(points), len(domain)), dtype=self.model_dtype)
+        for i, params_numpy in enumerate(
+            tqdm(points, desc=f"Generating training set for rank {mpi.RANK}")):
+            params = self.params_dtype(
+                **dict(zip(self.params, np.atleast_1d(params_numpy)))
+            )
+            model_i = self.compute(params, domain)
+            if self.model_dtype == complex:
+                my_ts[i] = model_i / np.sqrt(np.vdot(model_i, model_i))
+            else:
+                my_ts[i] = model_i / np.sqrt(np.dot(model_i, model_i))
+
+        return my_ts
 
 
 # The code that follows has been copied directly from the Uvicorn codebase: https://github.com/encode/uvicorn

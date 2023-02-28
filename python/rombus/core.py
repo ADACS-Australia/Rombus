@@ -2,7 +2,6 @@ import sys
 from typing import Dict, List, NamedTuple, Tuple
 
 import numpy as np
-from tqdm.auto import tqdm
 
 import rombus.algorithms as algorithms
 import rombus.misc as misc
@@ -11,27 +10,6 @@ import rombus.mpi as mpi
 
 
 random = np.random.default_rng()
-
-
-def generate_training_set(model, greedypoints: List[np.ndarray]) -> np.ndarray:
-    """returns a list of models (one for each row in 'greedypoints')"""
-
-    domain = model.init_domain()
-
-    my_ts = np.zeros(shape=(len(greedypoints), len(domain)), dtype=model.model_dtype)
-    for i, params_numpy in enumerate(
-        tqdm(greedypoints, desc=f"Generating training set for rank {mpi.RANK}")
-    ):
-        params = model.params_dtype(
-            **dict(zip(model.params, np.atleast_1d(params_numpy)))
-        )
-        model_i = model.compute(params, domain)
-        if model.model_dtype == complex:
-            my_ts[i] = model_i / np.sqrt(np.vdot(model_i, model_i))
-        else:
-            my_ts[i] = model_i / np.sqrt(np.dot(model_i, model_i))
-
-    return my_ts
 
 
 def read_divide_and_send_data_to_ranks(datafile: str) -> Tuple[List[np.ndarray], Dict]:
@@ -160,7 +138,7 @@ def validate_and_refine_basis(
     random_samples = generate_random_samples(model, N_validations)
     validation_samples, chunk_counts = divide_and_send_data_to_ranks(random_samples)
 
-    my_vs = generate_training_set(model, validation_samples)
+    my_vs = model.generate_model_set(validation_samples)
 
     n_added = 0
     RB_transpose = np.transpose(RB_matrix)
@@ -208,7 +186,7 @@ def make_reduced_basis(model, greedypoints, chunk_counts, write_results=True):
     FILENAME_IN is the 'greedy points' numpy file to take as input
     """
 
-    my_ts = generate_training_set(model, greedypoints)
+    my_ts = model.generate_model_set(greedypoints)
     RB_matrix = init_basis_matrix(
         my_ts[0]
     )  # hardcoding 1st model to be used to start the basis
