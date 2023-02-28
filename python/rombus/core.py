@@ -31,7 +31,10 @@ def generate_training_set(model, greedypoints: List[np.ndarray]) -> np.ndarray:
             **dict(zip(model.params, np.atleast_1d(params_numpy)))
         )
         model_i = model.compute(params, domain)
-        my_ts[i] = model_i / np.sqrt(np.vdot(model_i, model_i))
+        if model.model_dtype == complex:
+            my_ts[i] = model_i / np.sqrt(np.vdot(model_i, model_i))
+        else:
+            my_ts[i] = model_i / np.sqrt(np.dot(model_i, model_i))
 
     return my_ts
 
@@ -77,21 +80,19 @@ def init_basis_matrix(init_model):
     return RB_matrix
 
 
-def add_next_model_to_basis(RB_matrix, pc_matrix, my_ts, iter):
+def add_next_model_to_basis(model, RB_matrix, pc_matrix, my_ts, iter):
     # project training set on basis + get errors
-    pc = misc.project_onto_basis(1.0, RB_matrix, my_ts, iter - 1, complex)
+    pc = misc.project_onto_basis(
+        model, 1.0, RB_matrix, my_ts, iter - 1, model.model_dtype
+    )
     pc_matrix.append(pc)
-    # projection_errors = [
-    #    1 - dot_product(1.0, np.array(pc_matrix).T[jj], np.array(pc_matrix).T[jj])
-    #    for jj in range(len(np.array(pc_matrix).T))
-    # ]
-    # _l = len(np.array(pc_matrix).T)
     projection_errors = list(
         1
         - np.einsum(
             "ij,ij->i", np.array(np.conjugate(pc_matrix)).T, np.array(pc_matrix).T
         )
     )
+
     # gather all errors (below is a list[ rank0_errors, rank1_errors...])
     all_rank_errors = COMM.gather(projection_errors, root=MAIN_RANK)
 
@@ -119,7 +120,7 @@ def add_next_model_to_basis(RB_matrix, pc_matrix, my_ts, iter):
     # adding worst model to basis
     if RANK == MAIN_RANK:
         # Gram-Schmidt to get the next basis and normalize
-        RB_matrix.append(misc.IMGS(RB_matrix, worst_model, iter))
+        RB_matrix.append(misc.IMGS(model, RB_matrix, worst_model, iter))
 
     # share the basis with ALL nodes
     RB_matrix = COMM.bcast(RB_matrix, root=MAIN_RANK)
@@ -167,9 +168,10 @@ def validate_and_refine_basis(
     n_added = 0
     RB_transpose = np.transpose(RB_matrix)
     for i, validation_sample in enumerate(validation_samples):
-        proj_error = 1 - np.sum(np.dot(my_vs[i], RB_transpose))
-        # proj_error = 1 - np.einsum( "ij,ij->i", np.array(np.conjugate(pc_matrix)).T, np.array(pc_matrix).T)
-        print(f"params:{validation_sample} error={proj_error}")
+        if model.model_dtype == complex:
+            proj_error = 1 - np.sum(np.vdot(my_vs[i], RB_transpose) ** 2)
+        else:
+            proj_error = 1 - np.sum(np.dot(my_vs[i], RB_transpose) ** 2)
         if proj_error > tol:
             selected_greedy_points.append(validation_sample)
             n_added = n_added + 1
@@ -185,7 +187,7 @@ def validate_and_refine_basis(
     return RB_updated, selected_greedy_points
 
 
-def refine(model, greedypoints, chunk_counts, tol=1e-4, N_validations=100):
+def refine(model, greedypoints, chunk_counts, tol=1e-4, N_validations=200):
 
     RB, selected_greedy_points = make_reduced_basis(
         model, greedypoints, chunk_counts, write_results=False
@@ -223,7 +225,7 @@ def make_reduced_basis(model, greedypoints, chunk_counts, write_results=True):
         print("Filling basis with greedy-algorithm")
     while error > 1e-14:
         RB_matrix, pc_matrix, error_data = add_next_model_to_basis(
-            RB_matrix, pc_matrix, my_ts, iter
+            model, RB_matrix, pc_matrix, my_ts, iter
         )
         err_rnk, err_idx, error = error_data
 
