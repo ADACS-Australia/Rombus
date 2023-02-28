@@ -2,18 +2,13 @@ import sys
 from typing import Dict, List, NamedTuple, Tuple
 
 import numpy as np
-from mpi4py import MPI
 from tqdm.auto import tqdm
 
 import rombus.algorithms as algorithms
 import rombus.misc as misc
 import rombus.plot as plot
+import rombus.mpi as mpi
 
-MAIN_RANK = 0
-
-COMM = MPI.COMM_WORLD
-SIZE = COMM.Get_size()
-RANK = COMM.Get_rank()
 
 random = np.random.default_rng()
 
@@ -25,7 +20,7 @@ def generate_training_set(model, greedypoints: List[np.ndarray]) -> np.ndarray:
 
     my_ts = np.zeros(shape=(len(greedypoints), len(domain)), dtype=model.model_dtype)
     for i, params_numpy in enumerate(
-        tqdm(greedypoints, desc=f"Generating training set for rank {RANK}")
+        tqdm(greedypoints, desc=f"Generating training set for rank {mpi.RANK}")
     ):
         params = model.params_dtype(
             **dict(zip(model.params, np.atleast_1d(params_numpy)))
@@ -41,7 +36,7 @@ def generate_training_set(model, greedypoints: List[np.ndarray]) -> np.ndarray:
 
 def read_divide_and_send_data_to_ranks(datafile: str) -> Tuple[List[np.ndarray], Dict]:
     # dividing greedypoints into chunks
-    if RANK == MAIN_RANK:
+    if mpi.RANK_IS_MAIN:
         if datafile.endswith(".npy"):
             greedypoints = np.load(datafile)
         elif datafile.endswith(".csv"):
@@ -59,24 +54,26 @@ def divide_and_send_data_to_ranks(
 ) -> Tuple[List[np.ndarray], Dict]:
     chunks = None
     chunk_counts = None
-    if RANK == MAIN_RANK:
-        chunks = [[] for _ in range(SIZE)]
+    if mpi.RANK_IS_MAIN:
+        chunks = [[] for _ in range(mpi.SIZE)]
         for i, chunk in enumerate(greedypoints):
-            chunks[i % SIZE].append(chunk)
+            chunks[i % mpi.SIZE].append(chunk)
         chunk_counts = {i: len(chunks[i]) for i in range(len(chunks))}
 
-    greedypoints = COMM.scatter(chunks, root=MAIN_RANK)
-    chunk_counts = COMM.bcast(chunk_counts, root=MAIN_RANK)
+    greedypoints = mpi.COMM.scatter(chunks, root=mpi.MAIN_RANK)
+    chunk_counts = mpi.COMM.bcast(chunk_counts, root=mpi.MAIN_RANK)
     return greedypoints, chunk_counts
 
 
 def init_basis_matrix(init_model):
     # init the baisis (RB_matrix) with 1 model from the training set to start
-    if RANK == MAIN_RANK:
+    if mpi.RANK_IS_MAIN:
         RB_matrix = [init_model]
     else:
         RB_matrix = None
-    RB_matrix = COMM.bcast(RB_matrix, root=MAIN_RANK)  # share the basis with ALL nodes
+    RB_matrix = mpi.COMM.bcast(
+        RB_matrix, root=mpi.MAIN_RANK
+    )  # share the basis with ALL nodes
     return RB_matrix
 
 
@@ -94,36 +91,36 @@ def add_next_model_to_basis(model, RB_matrix, pc_matrix, my_ts, iter):
     )
 
     # gather all errors (below is a list[ rank0_errors, rank1_errors...])
-    all_rank_errors = COMM.gather(projection_errors, root=MAIN_RANK)
+    all_rank_errors = mpi.COMM.gather(projection_errors, root=mpi.MAIN_RANK)
 
     # determine highest error
-    if RANK == MAIN_RANK:
+    if mpi.RANK_IS_MAIN:
         error_data = misc.get_highest_error(all_rank_errors)
         err_rank, err_idx, error = error_data
     else:
         error_data = None, None, None
-    error_data = COMM.bcast(
-        error_data, root=MAIN_RANK
+    error_data = mpi.COMM.bcast(
+        error_data, root=mpi.MAIN_RANK
     )  # share the error data with all nodes
     err_rank, err_idx, error = error_data
 
     # get model with the worst error
     worst_model = None
-    if err_rank == MAIN_RANK:
+    if err_rank == mpi.MAIN_RANK:
         worst_model = my_ts[err_idx]  # no need to send
-    elif RANK == err_rank:
+    elif mpi.RANK == err_rank:
         worst_model = my_ts[err_idx]
-        COMM.send(worst_model, dest=MAIN_RANK)
-    if worst_model is None and RANK == MAIN_RANK:
-        worst_model = COMM.recv(source=err_rank)
+        mpi.COMM.send(worst_model, dest=mpi.MAIN_RANK)
+    if worst_model is None and mpi.RANK_IS_MAIN:
+        worst_model = mpi.COMM.recv(source=err_rank)
 
     # adding worst model to basis
-    if RANK == MAIN_RANK:
+    if mpi.RANK_IS_MAIN:
         # Gram-Schmidt to get the next basis and normalize
         RB_matrix.append(misc.IMGS(model, RB_matrix, worst_model, iter))
 
     # share the basis with ALL nodes
-    RB_matrix = COMM.bcast(RB_matrix, root=MAIN_RANK)
+    RB_matrix = mpi.COMM.bcast(RB_matrix, root=mpi.MAIN_RANK)
     return RB_matrix, pc_matrix, error_data
 
 
@@ -175,7 +172,7 @@ def validate_and_refine_basis(
         if proj_error > tol:
             selected_greedy_points.append(validation_sample)
             n_added = n_added + 1
-    if RANK == MAIN_RANK:
+    if mpi.RANK_IS_MAIN:
         print(f"Number of samples added: {n_added}")
 
     # add the inaccurate points to the original selected greedy
@@ -221,7 +218,7 @@ def make_reduced_basis(model, greedypoints, chunk_counts, write_results=True):
     iter = 1
     basis_indicies = [0]  # we've used the 1st model already
     pc_matrix = []
-    if RANK == MAIN_RANK:
+    if mpi.RANK_IS_MAIN:
         print("Filling basis with greedy-algorithm")
     while error > 1e-14:
         RB_matrix, pc_matrix, error_data = add_next_model_to_basis(
@@ -239,7 +236,7 @@ def make_reduced_basis(model, greedypoints, chunk_counts, write_results=True):
         # update iteration count
         iter += 1
 
-    if RANK == MAIN_RANK:
+    if mpi.RANK_IS_MAIN:
         print("\nBasis generation complete!")
         if write_results:
             np.save("RB_matrix", RB_matrix)
