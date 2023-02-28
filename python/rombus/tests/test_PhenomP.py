@@ -22,7 +22,7 @@ def test_PhenomP(tmp_path):
             cli,
             [
                 "rombus.tests.PhenomP:model",
-                "make-reduced-basis",
+                "build",
                 greedy_filename,
             ],
         )
@@ -31,15 +31,7 @@ def test_PhenomP(tmp_path):
             cli,
             [
                 "rombus.tests.PhenomP:model",
-                "make-empirical-interpolant",
-            ],
-        )
-        assert result.exit_code == 0
-        result = runner.invoke(
-            cli,
-            [
-                "rombus.tests.PhenomP:model",
-                "compare-rom-to-true",
+                "evaluate",
                 "m1=23.07487209351506",
                 "m2=29.753779794217984",
                 "chi1L=0.3803919479347709",
