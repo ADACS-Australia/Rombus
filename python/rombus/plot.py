@@ -44,7 +44,7 @@ def compare_rom_to_true(model, model_params_in):
 
     model_full = model.compute(model_params, domain)
     model_nodes = model.compute(model_params, nodes)
-    model_rom = core.ROM(model, model_params, nodes, basis)
+    model_rom = core.compute_ROM(model, model_params, nodes, basis)
 
     np.save("ROM_diff", np.subtract(model_rom, model_full))
 

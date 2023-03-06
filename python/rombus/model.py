@@ -1,6 +1,6 @@
 import importlib
 from abc import ABCMeta, abstractmethod
-from collections import namedtuple
+from collections import namedtuple, Counter
 from typing import Any, List
 from tqdm.auto import tqdm
 
@@ -10,7 +10,8 @@ import rombus.mpi as mpi
 
 
 def init_model(model: str):
-    # Import the model code
+    """Import the model code"""
+
     model_class = import_from_string(model)
     return model_class()
 
@@ -51,15 +52,15 @@ class RombusModel(metaclass=ABCMeta):
     def compute(self, params: np.ndarray, domain) -> np.ndarray:
         pass
 
-
-    def generate_model_set(self, points: List[np.ndarray]) -> np.ndarray:
-        """returns a list of models (one for each row in 'points')"""
+    def generate_model_set(self, samples: List[np.ndarray]) -> np.ndarray:
+        """returns a list of models (one for each row in 'samples')"""
 
         domain = self.init_domain()
 
-        my_ts = np.zeros(shape=(len(points), len(domain)), dtype=self.model_dtype)
+        my_ts = np.zeros(shape=(samples.n_samples, len(domain)), dtype=self.model_dtype)
         for i, params_numpy in enumerate(
-            tqdm(points, desc=f"Generating training set for rank {mpi.RANK}")):
+            tqdm(samples.samples, desc=f"Generating training set for rank {mpi.RANK}")
+        ):
             params = self.params_dtype(
                 **dict(zip(self.params, np.atleast_1d(params_numpy)))
             )
@@ -70,6 +71,27 @@ class RombusModel(metaclass=ABCMeta):
                 my_ts[i] = model_i / np.sqrt(np.dot(model_i, model_i))
 
         return my_ts
+
+    def parse_cli_params(self, args):
+        """Parse parameters from arguments given on command line"""
+
+        model_params = dict()
+        for param_i in args:
+            if not param_i.startswith("-"):
+                res = param_i.split("=")
+                if len(res) == 2:
+                    # NOTE: for now, all parameters are assumed to be floats
+                    model_params[res[0]] = float(res[1])
+                else:
+                    raise Exception(f"Don't know what to do with argument '{param_i}'")
+            else:
+                raise Exception(f"Don't know what to do with option '{param_i}'")
+
+        # Check that all parameters are specified and that they match what is
+        # defined in the model
+        assert Counter(model_params.keys()) == Counter(self.params)
+
+        return model_params
 
 
 # The code that follows has been copied directly from the Uvicorn codebase: https://github.com/encode/uvicorn
