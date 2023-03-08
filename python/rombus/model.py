@@ -4,20 +4,14 @@ from collections import namedtuple, Counter
 from typing import Any, List
 from tqdm.auto import tqdm
 
+import h5py
 import numpy as np
 
 import rombus.mpi as mpi
 
 
-def init_model(model: str):
-    """Import the model code"""
-
-    model_class = import_from_string(model)
-    return model_class()
-
-
 class RombusModel(metaclass=ABCMeta):
-    def __init__(self):
+    def __init__(self, model_str):
 
         # Run an optional init() method
         self.init()
@@ -30,6 +24,10 @@ class RombusModel(metaclass=ABCMeta):
 
         # Create the named tuple that will be used for parameters
         self.params_dtype = namedtuple("params_dtype", self.params)
+
+        # Keep track of the model string so we can reinstantiate from a saved state
+        self.model_str = model_str
+        self.model_basename = self.model_str.split(":")[0].split(",")[0]
 
     def init(self):
         pass
@@ -92,6 +90,35 @@ class RombusModel(metaclass=ABCMeta):
         assert Counter(model_params.keys()) == Counter(self.params)
 
         return model_params
+
+    @classmethod
+    def load(cls, model: str):
+        """Import the model code"""
+
+        model_class = import_from_string(model)
+        return model_class(model)
+
+    def write(self, h5file):
+        """Save samples to file"""
+
+        h5_group = h5file.create_group("model")
+        h5_group.create_dataset("model_str", data=self.model_str)
+
+    @classmethod
+    def from_file(cls, file_in):
+        """Create a ROM instance from a file"""
+
+        close_file = False
+        if not isinstance(file_in, str):
+            h5file = file_in
+        else:
+            h5file = h5py.File(file_in, "r")
+            close_file = True
+
+        model_str = h5file["model/model_str"].asstr()[()]
+        if close_file:
+            h5file.close()
+        return cls.load(model_str)
 
 
 # The code that follows has been copied directly from the Uvicorn codebase: https://github.com/encode/uvicorn

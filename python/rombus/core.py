@@ -1,13 +1,14 @@
 import sys
 from typing import List
 
+import h5py
 import mpi4py
 import numpy as np
 
 import rombus.algorithms as algorithms
 import rombus.misc as misc
 import rombus.mpi as mpi
-from rombus.model import RombusModel, init_model
+from rombus.model import RombusModel
 
 DEFAULT_TOLERANCE = 1e-14
 DEFAULT_REFINE_N_RANDOM = 100
@@ -24,45 +25,90 @@ class ROM(object):
     ):
 
         if isinstance(model, str):
-            self.model = init_model(model)
+            self.model = RombusModel.load(model)
         elif isinstance(model, RombusModel):
             self.model = model
         else:
             raise Exception
 
-        self.ROM = ROM
+        self.model = model
         self.samples = samples
-        self.reduced_basis = None
-        self.empirical_interpolant = None
+        self.reduced_basis = reduced_basis
+        self.empirical_interpolant = empirical_interpolant
 
-        self.build(tol=tol)
+    #        if reduced_basis is None:
+    #            if empirical_interpolant is not None:
+    #                raise Exception
+    #            self.build(tol=tol)
 
     def build(self, do_step=None, tol=DEFAULT_TOLERANCE):
 
         if do_step is None or do_step == "RB":
-            self.reduced_basis = ReducedBasis(self.model, self.samples, tol=tol)
+            self.reduced_basis = ReducedBasis().compute(
+                self.model, self.samples, tol=tol
+            )
 
         if do_step is None or do_step == "EI":
             if self.reduced_basis is None:
                 raise Exception
-            self.empirical_interpolant = EmpiricalInterpolant(self.reduced_basis)
+            self.empirical_interpolant = EmpiricalInterpolant().compute(
+                self.reduced_basis
+            )
+
+        return self
 
     def refine(
         self, n_random=DEFAULT_REFINE_N_RANDOM, tol=DEFAULT_TOLERANCE, iterate=True
     ):
 
         if self.reduced_basis is None:
-            self.reduced_basis = ReducedBasis(
-                self.model, Samples(self.model, n_random=n_random)
+            self.reduced_basis = ReducedBasis().compute(
+                self.model, Samples(self.model, n_random=n_random, tol=tol)
             )
         self._validate_and_refine_basis(n_random, tol=tol, iterate=iterate)
 
-    def evaluate(self, params, domain):
-        _signal_at_nodes = self.model.compute(params, domain)
+        self.empirical_interpolant = EmpiricalInterpolant().compute(self.reduced_basis)
+
+        return self
+
+    def evaluate(self, params):
+        _signal_at_nodes = self.model.compute(params, self.empirical_interpolant.nodes)
         if self.model.model_dtype == complex:
-            return np.vdot(_signal_at_nodes, self.reduced_basis.matrix)
+            return np.vdot(_signal_at_nodes, self.empirical_interpolant.B_matrix)
         else:
-            return np.dot(_signal_at_nodes, self.reduced_basis.matrix)
+            return np.dot(_signal_at_nodes, self.empirical_interpolant.B_matrix)
+
+    def write(self, filename):
+        """Save ROM to file"""
+        with h5py.File(filename, "w") as h5file:
+            self.model.write(h5file)
+            self.samples.write(h5file)
+            if self.reduced_basis is not None:
+                self.reduced_basis.write(h5file)
+            if self.empirical_interpolant is not None:
+                self.empirical_interpolant.write(h5file)
+
+    @classmethod
+    def from_file(cls, file_in):
+        """Create a ROM instance from a file"""
+        close_file = False
+        if not isinstance(file_in, str):
+            h5file = file_in
+        else:
+            h5file = h5py.File(file_in, "r")
+            close_file = True
+        model = RombusModel.from_file(h5file)
+        samples = Samples.from_file(h5file)
+        reduced_basis = ReducedBasis.from_file(h5file)
+        empirical_interpolant = EmpiricalInterpolant.from_file(h5file)
+        if close_file:
+            h5file.close()
+        return cls(
+            model,
+            samples,
+            reduced_basis=reduced_basis,
+            empirical_interpolant=empirical_interpolant,
+        )
 
     def _validate_and_refine_basis(self, n_random, tol=DEFAULT_TOLERANCE, iterate=True):
 
@@ -91,7 +137,9 @@ class ROM(object):
             # add the inaccurate points to the original selected greedy
             # points and remake the basis
             self.samples.extend(selected_greedy_points)
-            self.reduced_basis = ReducedBasis(self.model, self.samples, tol=tol)
+            self.reduced_basis = ReducedBasis().compute(
+                self.model, self.samples, tol=tol
+            )
 
             if not iterate:
                 break
@@ -100,12 +148,7 @@ class ROM(object):
 class Samples(object):
     def __init__(self, model, filename=None, n_random=0):
 
-        if isinstance(model, str):
-            self.model = init_model(model)
-        elif isinstance(model, RombusModel):
-            self.model = model
-        else:
-            raise Exception
+        self.model = model
 
         # Needed for random number generation
         self.n_random = n_random
@@ -113,8 +156,8 @@ class Samples(object):
         self.random_starting_state = None
 
         # Initialise samples
-        self.samples = []
         self.n_samples = 0
+        self.samples = []
         if filename:
             self._add_from_file(filename)
         if self.n_random > 0:
@@ -125,6 +168,34 @@ class Samples(object):
         self.samples.extend(new_samples)
         self.n_samples = self.n_samples + len(new_samples)
 
+    def write(self, h5file):
+        """Save samples to file"""
+
+        h5_group = h5file.create_group("samples")
+        self.model.write(h5_group)
+        h5_group.create_dataset("samples", data=self.samples)
+        h5_group.create_dataset("n_samples", data=self.n_samples)
+
+    @classmethod
+    def from_file(cls, file_in):
+        """Create a ROM instance from a file"""
+
+        close_file = False
+        if not isinstance(file_in, str):
+            h5file = file_in
+        else:
+            h5file = h5py.File(file_in, "r")
+            close_file = True
+
+        model_str = h5file["samples/model/model_str"].asstr()[()]
+        model = RombusModel.load(model_str)
+        samples = cls(model)
+        samples.samples = [np.array(x) for x in h5file["samples/samples"]]
+        samples.n_samples = np.int32(h5file["samples/n_samples"])
+        if close_file:
+            h5file.close()
+        return samples
+
     def _add_from_file(self, filename_in: str):
 
         # dividing greedypoints into chunks
@@ -132,7 +203,10 @@ class Samples(object):
             if filename_in.endswith(".npy"):
                 samples = np.load(filename_in)
             elif filename_in.endswith(".csv"):
-                samples = np.genfromtxt(filename_in, delimiter=",")
+                samples = [
+                    np.array([x])
+                    for x in np.genfromtxt(filename_in, delimiter=",", comments="#")
+                ]
             else:
                 raise Exception
         else:
@@ -175,37 +249,39 @@ class Samples(object):
 
 
 class ReducedBasis(object):
-    def __init__(self, model, samples, tol=DEFAULT_TOLERANCE):
+    def __init__(self, matrix=[], greedypoints=[], error_list=[]):
         """Make reduced basis
 
         FILENAME_IN is the 'greedy points' numpy file to take as input
         """
 
+        self.matrix = matrix
+        self.greedypoints = greedypoints
+        self.error_list = error_list
+
+    def compute(self, model, samples, tol=DEFAULT_TOLERANCE):
+
         if isinstance(model, str):
-            self.model = init_model(model)
+            self.model = RombusModel.load(model)
         elif isinstance(model, RombusModel):
             self.model = model
         else:
             raise Exception
 
-        self.samples = samples
-        self.greedypoints = None
-        self.matrix = None
-        self.error_list = []
-
         # Compute the model for each given sample
         my_ts = model.generate_model_set(samples)
 
-        # hardcoding 1st model to be used to start the basis
-        self._init_matrix(my_ts[0])
-        print(self.matrix)
-
-        error = np.inf
-        iter = 1
-        basis_indicies = [0]  # we've used the 1st model already
-        pc_matrix = []
         if mpi.RANK_IS_MAIN:
             print("Filling basis with greedy-algorithm")
+
+        # hardcoding 1st model to be used to start the basis
+        self._init_matrix(my_ts[0])
+        basis_indicies = [0]
+
+        # NOTE: NEED TO FIX; THE FIRST INDEX IS BEING ADDED TWICE HERE!
+        error = np.inf
+        iter = 1
+        pc_matrix = []
         while error > tol:
             self.matrix, pc_matrix, error_data = self._add_next_model_to_basis(
                 pc_matrix, my_ts, iter
@@ -217,7 +293,7 @@ class ReducedBasis(object):
             sys.stdout.write("\033[K" + m + "\r")
 
             basis_index = self._convert_to_basis_index(
-                err_rnk, err_idx, self.samples.n_samples
+                err_rnk, err_idx, samples.n_samples
             )
             self.error_list.append(error)
             basis_indicies.append(basis_index)
@@ -226,6 +302,10 @@ class ReducedBasis(object):
             iter += 1
 
         self.matrix = np.asarray(self.matrix)
+        self.greedypoints = [samples.samples[i] for i in basis_indicies]
+        self.error_list = np.asarray(self.error_list)
+
+        return self
 
         # if mpi.RANK_IS_MAIN:
         #    print("\nBasis generation complete!")
@@ -234,7 +314,31 @@ class ReducedBasis(object):
         #        plot.errors(error_list)
         #        plot.basis(matrix)
 
-        self.greedypoints = [samples.samples[i] for i in basis_indicies]
+    def write(self, h5file):
+        """Save samples to file"""
+
+        h5_group = h5file.create_group("reduced_basis")
+        h5_group.create_dataset("matrix", data=self.matrix)
+        h5_group.create_dataset("greedypoints", data=self.greedypoints)
+        h5_group.create_dataset("error_list", data=self.error_list)
+
+    @classmethod
+    def from_file(cls, file_in):
+        """Create a ROM instance from a file"""
+
+        close_file = False
+        if not isinstance(file_in, str):
+            h5file = file_in
+        else:
+            h5file = h5py.File(file_in, "r")
+            close_file = True
+
+        matrix = np.array(h5file["reduced_basis/matrix"])
+        greedypoints = [np.array(x) for x in h5file["reduced_basis/greedypoints"]]
+        error_list = np.array(h5file["reduced_basis/error_list"])
+        if close_file:
+            h5file.close()
+        return cls(matrix=matrix, greedypoints=greedypoints, error_list=error_list)
 
     def _add_next_model_to_basis(self, pc_matrix, my_ts, iter):
         # project training set on basis + get errors
@@ -298,15 +402,18 @@ class ReducedBasis(object):
 
 
 class EmpiricalInterpolant(object):
-    def __init__(self, reduced_basis):
+    def __init__(self, B_matrix=None, nodes=None):
+        """Initialise empirical interpolant"""
+
+        self.B_matrix = B_matrix
+        self.nodes = nodes
+
+    def compute(self, reduced_basis):
         """Compute empirical interpolant"""
 
-        self.reduced_basis = reduced_basis
-        self.E_matrix = None
-        self.B_matrix = None
-        self.nodes = None
-
         # RB = RB[0 : len(RB)]
+        if mpi.RANK_IS_MAIN:
+            print("Computing empirical interpolant")
         eim = algorithms.StandardEIM(
             reduced_basis.matrix.shape[0], reduced_basis.matrix.shape[1]
         )
@@ -314,3 +421,28 @@ class EmpiricalInterpolant(object):
         domain = reduced_basis.model.init_domain()
         self.nodes = domain[eim.indices]
         self.nodes, self.B_matrix = zip(*sorted(zip(self.nodes, eim.B)))
+
+        return self
+
+    def write(self, h5file):
+        """Save empirical interpolant to file"""
+
+        h5_group = h5file.create_group("empirical_interpolant")
+        h5_group.create_dataset("B_matrix", data=self.B_matrix)
+        h5_group.create_dataset("nodes", data=self.nodes)
+
+    @classmethod
+    def from_file(cls, file_in):
+        """Create a ROM instance from a file"""
+
+        close_file = False
+        if not isinstance(file_in, str):
+            h5file = file_in
+        else:
+            h5file = h5py.File(file_in, "r")
+            close_file = True
+        B_matrix = np.array(h5file["empirical_interpolant/B_matrix"])
+        nodes = np.array(h5file["empirical_interpolant/nodes"])
+        if close_file:
+            h5file.close()
+        return cls(B_matrix=B_matrix, nodes=nodes)

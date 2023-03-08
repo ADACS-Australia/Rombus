@@ -5,7 +5,7 @@ import click
 import rombus.core as core
 import rombus.plot as plot
 
-from rombus.model import init_model
+from rombus.model import RombusModel
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 FLEX_CONTEXT_SETTINGS = dict(
@@ -16,39 +16,44 @@ FLEX_CONTEXT_SETTINGS = dict(
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
-@click.argument("model", type=str)
 @click.pass_context
-def cli(ctx, model):
+def cli(ctx):
     """Perform greedy algorythm operations with Rombus"""
 
     # ensure that ctx.obj exists and is a dict (in case `cli()` is called
     # by means other than the `if` block below)
     ctx.ensure_object(dict)
 
-    # Import user code defining the model we are working with
-    ctx.obj = init_model(model)
-
 
 @cli.command(context_settings=FLEX_CONTEXT_SETTINGS)
+@click.argument("filename_ROM", type=str)
 @click.argument("parameters", nargs=-1, type=click.UNPROCESSED)
 @click.pass_context
-def evaluate(ctx, parameters):
+def evaluate(ctx, filename_rom, parameters):
     """Evaluate a reduced order model and compare it to truth
 
     PARAMETERS is a list of parameter values of the form A=VAL B=VAL ..."""
 
-    # The model gets passed as context
-    model = ctx.obj
+    # Read ROM
+    ROM = core.ROM.from_file(filename_rom)
 
     # Parse the model parameters, which should have been given as arguments
-    model_params = model.parse_cli_params(parameters)
+    model_params = ROM.model.parse_cli_params(parameters)
 
     # Generate plot
-    plot.compare_rom_to_true(model, model_params)
+    plot.compare_rom_to_true(ROM, model_params)
 
 
 @cli.command(context_settings=CONTEXT_SETTINGS)
-@click.argument("filename_in", type=click.Path(exists=True))
+@click.argument("model", type=str)
+@click.argument("filename_samples", type=click.Path(exists=True))
+@click.option(
+    "--out",
+    "-o",
+    default="MODEL_BASENAME.hdf5",
+    show_default=True,
+    help="Output filename",
+)
 @click.option(
     "--do_step",
     type=click.Choice(["RB", "EI"], case_sensitive=False),
@@ -56,45 +61,42 @@ def evaluate(ctx, parameters):
     help="Do only one step: RB=reduced basis; EI=empirical interpolant",
 )
 @click.pass_context
-def build(ctx, filename_in, do_step):
+def build(ctx, model, filename_samples, out, do_step):
     """Build a reduced order model
 
     FILENAME_IN is the 'greedy points' numpy or csv file to take as input
     """
 
-    # The model gets passed as context
-    model = ctx.obj
+    # Load model
+    model = RombusModel.load(model)
 
-    # Compute the reduced basis
-    reduced_basis = None
-    if not do_step or do_step == "RB":
-        samples = core.Samples(model, filename=filename_in)
-        reduced_basis = core.ReducedBasis(model, samples)
+    # Load samples
+    samples = core.Samples(model, filename=filename_samples)
 
-    # Compute the empirical interpolant
-    if not do_step or do_step == "EI":
-        # Still need to implement reading of reduced_basis for this
-        if reduced_basis is None:
-            raise Exception
-        core.EmpiricalInterpolant(reduced_basis)
+    # Build ROM
+    ROM = core.ROM(model, samples).build(do_step=do_step)
+
+    # Write ROM
+    if out == "MODEL_BASENAME.hdf5":
+        filename_out = f"{model.model_basename}.hdf5"
+    else:
+        filename_out = out
+    ROM.write(filename_out)
 
 
 @cli.command(context_settings=CONTEXT_SETTINGS)
-@click.argument("filename_in", type=click.Path(exists=True))
+@click.argument("filename_ROM", type=click.Path(exists=True))
 @click.pass_context
-def refine(ctx, filename_in):
+def refine(ctx, filename_rom):
     """Refine parameter sampling to impove a reduced order model"""
 
-    model = ctx.obj
-
-    # Load samples from file
-    samples = core.Samples(model, filename=filename_in)
-
     # Build model and refine it
-    ROM = core.ROM(model, samples).refine()
+    ROM = core.ROM.from_file(filename_rom).refine()
 
     # Write results
-    print(ROM)
+    filename_split = filename_rom.rsplit(".", 1)
+    filename_out = f"{filename_split[0]}_refined.{filename_split[1]}"
+    ROM.write(filename_out)
 
 
 if __name__ == "__main__":

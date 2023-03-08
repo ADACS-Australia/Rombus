@@ -1,8 +1,6 @@
 import numpy as np
 import pylab as plt
 
-import rombus.core as core
-
 
 def errors(err_list):
     plt.plot(err_list)
@@ -32,24 +30,21 @@ def basis(rb_matrix):
     fig.savefig("basis.png")
 
 
-def compare_rom_to_true(model, model_params_in):
+def compare_rom_to_true(ROM, model_params_in):
     """Compare computed ROM to input model"""
 
-    basis = np.load("B_matrix.npy")
-    nodes = np.load("nodes.npy")
+    model_params = ROM.model.params_dtype(**model_params_in)
 
-    model_params = model.params_dtype(**model_params_in)
+    domain = ROM.model.init_domain()
 
-    domain = model.init_domain()
-
-    model_full = model.compute(model_params, domain)
-    model_nodes = model.compute(model_params, nodes)
-    model_rom = core.compute_ROM(model, model_params, nodes, basis)
-
-    np.save("ROM_diff", np.subtract(model_rom, model_full))
+    model_full = ROM.model.compute(model_params, domain)
+    model_nodes = ROM.model.compute(model_params, ROM.empirical_interpolant.nodes)
+    model_rom = ROM.evaluate(model_params)
 
     plt.semilogx(domain, model_rom, label="ROM", alpha=0.5, linestyle="--")
     plt.semilogx(domain, model_full, label="Full model", alpha=0.5)
-    plt.scatter(nodes, model_nodes, s=1)
+    plt.scatter(ROM.empirical_interpolant.nodes, model_nodes, s=1)
     plt.legend()
+
+    np.save("ROM_diff", np.subtract(model_rom, model_full))
     plt.savefig("comparison.pdf", bbox_inches="tight")
