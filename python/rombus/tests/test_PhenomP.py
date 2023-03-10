@@ -21,8 +21,8 @@ def test_PhenomP(tmp_path):
         result = runner.invoke(
             cli,
             [
-                "rombus.tests.PhenomP:model",
                 "build",
+                "rombus.tests.PhenomP:model",
                 greedy_filename,
             ],
         )
@@ -30,8 +30,8 @@ def test_PhenomP(tmp_path):
         result = runner.invoke(
             cli,
             [
-                "rombus.tests.PhenomP:model",
                 "evaluate",
+                "rombus.tests.PhenomP.hdf5",
                 "m1=23.07487209351506",
                 "m2=29.753779794217984",
                 "chi1L=0.3803919479347709",

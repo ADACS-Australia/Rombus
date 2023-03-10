@@ -18,6 +18,7 @@ class model(RombusModel):
     params.add("chip", 0, 0.1)  # noqa F821
     params.add("thetaJ", -np.pi / 2, np.pi / 2)  # noqa F821
     params.add("alpha", 0, np.pi / 2)  # noqa F821
+    params.set_validation(lambda p: p.m1 >= p.m2)  # noqa F821
 
     def cache(self):
         self.l1 = 0
