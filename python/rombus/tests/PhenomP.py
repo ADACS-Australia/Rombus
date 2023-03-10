@@ -11,9 +11,15 @@ class model(RombusModel):
 
     model_dtype = "complex"
 
-    params = ["m1", "m2", "chi1L", "chi2L", "chip", "thetaJ", "alpha"]
+    params.add("m1", 30, 35)  # noqa F821
+    params.add("m2", 30, 35)  # noqa F821
+    params.add("chi1L", 0, 0.1)  # noqa F821
+    params.add("chi2L", 0, 0.1)  # noqa F821
+    params.add("chip", 0, 0.1)  # noqa F821
+    params.add("thetaJ", -np.pi / 2, np.pi / 2)  # noqa F821
+    params.add("alpha", 0, np.pi / 2)  # noqa F821
 
-    def init(self):
+    def cache(self):
         self.l1 = 0
         self.l2 = 0
         self.fmin = 20
@@ -24,7 +30,7 @@ class model(RombusModel):
         self.fmin_index = int(self.fmin / self.deltaF)
         self.WFdict = lal.CreateDict()
 
-    def init_domain(self):
+    def set_domain(self):
         return self.fseries
 
     def compute(self, params: NamedTuple, domain) -> np.array:

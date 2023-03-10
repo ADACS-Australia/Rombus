@@ -224,9 +224,9 @@ class Samples(object):
         self.random_starting_state = np.random.get_state()
         samples = []
         for _ in range(n_samples):
-            new_sample = np.ndarray(len(self.model.params), dtype=np.float64)
-            for i in range(len(self.model.params)):
-                new_sample[i] = self.random.random() * 10.0
+            new_sample = np.ndarray(self.model.params.count, dtype=np.float64)
+            for i, param in enumerate(self.model.params):
+                new_sample[i] = self.random.uniform(low=param.min, high=param.max)
             samples.append(new_sample)
 
         new_samples = self._decompose_samples(samples)
@@ -418,7 +418,7 @@ class EmpiricalInterpolant(object):
             reduced_basis.matrix.shape[0], reduced_basis.matrix.shape[1]
         )
         eim.make(reduced_basis.matrix)
-        domain = reduced_basis.model.init_domain()
+        domain = reduced_basis.model.domain
         self.nodes = domain[eim.indices]
         self.nodes, self.B_matrix = zip(*sorted(zip(self.nodes, eim.B)))
 

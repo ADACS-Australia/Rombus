@@ -10,26 +10,83 @@ import numpy as np
 import rombus.mpi as mpi
 
 
-class RombusModel(metaclass=ABCMeta):
+class RombusModelMeta(type):
+    def __prepare__(name, *args, **kwargs):
+        """Initialise the dictionary that gets passed to __new___.
+
+        This is needed here because we don't want the user to have to
+        initialise the member(s) that we are adding.  This is the only
+        method that gets sourced before the class code is executed, so
+        it needs to be done here, not in __new___.
+        """
+
+        class Params(object):
+            def __init__(self):
+                self.params = []
+                self.names = []
+                self.count = 0
+                self._idx = -1
+
+            def add(self, name, range_min, range_max):
+                Param = namedtuple("Param", "name min max")
+                self.params.append(Param(name, range_min, range_max))
+                self.count = self.count + 1
+                self.names.append(name)
+
+            def __iter__(self):
+                self._idx = -1
+                return self
+
+            def __next__(self):
+                self._idx = self._idx + 1
+                if self._idx >= self.count:
+                    raise StopIteration
+                return self.params[self._idx]
+
+        result = dict()
+
+        # Initialise the following members↵
+        result["params"] = Params()
+
+        return result
+
+    def __new__(mcs, name, bases, dct):
+
+        # Perform super-metaclass construction↵
+        return super(RombusModelMeta, mcs).__new__(mcs, name, bases, dct)
+
+
+class RombusModelABCMeta(RombusModelMeta, ABCMeta):
+    pass
+
+
+class RombusModel(metaclass=RombusModelABCMeta):
     def __init__(self, model_str):
 
-        # Run an optional init() method
-        self.init()
-
-        # Ensure params is a list of strings
-        assert bool(self.params) and all(isinstance(elem, str) for elem in self.params)
+        # Check that at least one parameter has beed defined
+        assert self.params.count > 0
 
         # Ensure that model_dtype is a string
         assert type(self.model_dtype) == str
 
+        # Run an optional init() method
+        self.cache()
+
+        # Initialise the domain
+        self.domain = self.set_domain()
+        self.n_domain = len(self.domain)
+
+        # Check that the domain has been suitably set
+        assert self.n_domain > 0
+
         # Create the named tuple that will be used for parameters
-        self.params_dtype = namedtuple("params_dtype", self.params)
+        self.params_dtype = namedtuple("params_dtype", self.params.names)
 
         # Keep track of the model string so we can reinstantiate from a saved state
         self.model_str = model_str
         self.model_basename = self.model_str.split(":")[0].split(",")[0]
 
-    def init(self):
+    def cache(self):
         pass
 
     @property
@@ -37,13 +94,8 @@ class RombusModel(metaclass=ABCMeta):
     def model_dtype(self):
         pass
 
-    @property
     @abstractmethod  # make sure this is the inner-most decorator
-    def params(self):
-        pass
-
-    @abstractmethod  # make sure this is the inner-most decorator
-    def init_domain(self):
+    def set_domain(self):
         pass
 
     @abstractmethod  # make sure this is the inner-most decorator
@@ -53,16 +105,16 @@ class RombusModel(metaclass=ABCMeta):
     def generate_model_set(self, samples: List[np.ndarray]) -> np.ndarray:
         """returns a list of models (one for each row in 'samples')"""
 
-        domain = self.init_domain()
-
-        my_ts = np.zeros(shape=(samples.n_samples, len(domain)), dtype=self.model_dtype)
+        my_ts = np.zeros(
+            shape=(samples.n_samples, self.n_domain), dtype=self.model_dtype
+        )
         for i, params_numpy in enumerate(
             tqdm(samples.samples, desc=f"Generating training set for rank {mpi.RANK}")
         ):
             params = self.params_dtype(
-                **dict(zip(self.params, np.atleast_1d(params_numpy)))
+                **dict(zip(self.params.names, np.atleast_1d(params_numpy)))
             )
-            model_i = self.compute(params, domain)
+            model_i = self.compute(params, self.domain)
             if self.model_dtype == complex:
                 my_ts[i] = model_i / np.sqrt(np.vdot(model_i, model_i))
             else:
@@ -87,7 +139,7 @@ class RombusModel(metaclass=ABCMeta):
 
         # Check that all parameters are specified and that they match what is
         # defined in the model
-        assert Counter(model_params.keys()) == Counter(self.params)
+        assert Counter(model_params.keys()) == Counter(self.params.names)
 
         return model_params
 

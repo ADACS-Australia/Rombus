@@ -35,7 +35,7 @@ def compare_rom_to_true(ROM, model_params_in):
 
     model_params = ROM.model.params_dtype(**model_params_in)
 
-    domain = ROM.model.init_domain()
+    domain = ROM.model.domain
 
     model_full = ROM.model.compute(model_params, domain)
     model_nodes = ROM.model.compute(model_params, ROM.empirical_interpolant.nodes)
