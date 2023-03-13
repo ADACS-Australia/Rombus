@@ -41,14 +41,23 @@ def cli(ctx):
 
 
 @cli.command(context_settings=CONTEXT_SETTINGS)
+@click.argument("project_name", type=str)
+def quickstart(project_name):
+    """Write a project template to build a new project from."""
+
+    RombusModel.write_project_template(project_name)
+
+
+@cli.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("model", type=str)
 @click.argument("filename_samples", type=click.Path(exists=True))
 @click.option(
     "--out",
     "-o",
     default="MODEL_BASENAME.hdf5",
+    type=click.Path(exists=False),
     show_default=True,
-    help="Output filename",
+    help="Output HDF5 filename",
 )
 @click.option(
     "--do_step",

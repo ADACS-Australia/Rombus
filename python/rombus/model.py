@@ -1,4 +1,7 @@
 import importlib
+import sys
+import os
+import shutil
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple, Counter
 from typing import Any, List, Callable
@@ -199,6 +202,28 @@ class RombusModel(metaclass=RombusModelABCMeta):
         if close_file:
             h5file.close()
         return cls.load(model_str)
+
+    @classmethod
+    def write_project_template(cls, project_name):
+        """Write a project model and sample file to start a new project from."""
+
+        # Set the model we will template from
+        model_name = "sinc"
+
+        # Set source file paths
+        pkgdir = sys.modules["rombus"].__path__[0]
+        model_file_source = os.path.join(pkgdir, "models", f"{model_name}.py")
+        samples_file_source = os.path.join(
+            pkgdir, "models", f"{model_name}_samples.csv"
+        )
+
+        # Set output file paths
+        model_file_out = os.path.join(os.getcwd(), f"{project_name}.py")
+        samples_file_out = os.path.join(os.getcwd(), f"{project_name}_samples.csv")
+
+        # Copy files
+        shutil.copy(model_file_source, model_file_out)
+        shutil.copy(samples_file_source, samples_file_out)
 
 
 # The code that follows has been copied directly from the Uvicorn codebase: https://github.com/encode/uvicorn
