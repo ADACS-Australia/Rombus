@@ -43,7 +43,7 @@ def cli(ctx):
 @cli.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("project_name", type=str)
 def quickstart(project_name):
-    """Write a project template to build a new project from."""
+    """Write a project template to build a new project from"""
 
     RombusModel.write_project_template(project_name)
 

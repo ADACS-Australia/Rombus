@@ -69,7 +69,7 @@ class Params(object):
         return self.params[self._idx]
 
 
-class RombusModelMeta(type):
+class _RombusModelMeta(type):
     def __prepare__(name, *args, **kwargs):
         """Initialise the dictionary that gets passed to __new___.
 
@@ -90,14 +90,14 @@ class RombusModelMeta(type):
     def __new__(mcs, name, bases, dct):
 
         # Perform super-metaclass construction↵
-        return super(RombusModelMeta, mcs).__new__(mcs, name, bases, dct)
+        return super(_RombusModelMeta, mcs).__new__(mcs, name, bases, dct)
 
 
-class RombusModelABCMeta(RombusModelMeta, ABCMeta):
+class _RombusModelABCMeta(_RombusModelMeta, ABCMeta):
     pass
 
 
-class RombusModel(metaclass=RombusModelABCMeta):
+class RombusModel(metaclass=_RombusModelABCMeta):
     def __init__(self, model_str):
 
         # Check that at least one parameter has beed defined
