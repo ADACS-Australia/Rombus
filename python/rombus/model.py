@@ -7,7 +7,7 @@ from tqdm.auto import tqdm
 import h5py
 import numpy as np
 
-import rombus.mpi as mpi
+import rombus._core.mpi as mpi
 
 MAX_N_TRIES = 1000
 
@@ -80,6 +80,7 @@ class RombusModelMeta(type):
 
         # Initialise the following members↵
         result["params"] = Params()
+        result["model_dtype"] = "float64"
 
         return result
 

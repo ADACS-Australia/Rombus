@@ -1,4 +1,4 @@
-import rombus.integrals as integrals
+import rombus._core.integrals as integrals
 
 
 def test_rate_to_num():

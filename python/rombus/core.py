@@ -5,9 +5,9 @@ import h5py
 import mpi4py
 import numpy as np
 
-import rombus.algorithms as algorithms
-import rombus.misc as misc
-import rombus.mpi as mpi
+import rombus._core.algorithms as algorithms
+import rombus._core.misc as misc
+import rombus._core.mpi as mpi
 from rombus.model import RombusModel
 
 DEFAULT_TOLERANCE = 1e-14
