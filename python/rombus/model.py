@@ -36,13 +36,13 @@ class Params(object):
     def set_validation(self, func: Callable):
         self._validate = func
 
-    def generate_random_sample(self, n_samples):
+    def generate_random_sample(self, random_generator):
 
         new_sample = np.ndarray(self.count, dtype=np.float64)
         n_tries = 0
         while True:
             for i, param in enumerate(self.params):
-                new_sample[i] = self.random.uniform(low=param.min, high=param.max)
+                new_sample[i] = random_generator.uniform(low=param.min, high=param.max)
             param = self.np2param(new_sample)
             if self._validate(param):
                 break
@@ -52,7 +52,6 @@ class Params(object):
                     raise Exception(
                         f"Max number of tries ({MAX_N_TRIES}) reached when trying to generate a valid random parameter set"
                     )
-
         return new_sample
 
     def np2param(self, params_np):
@@ -121,11 +120,6 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         self.model_basename = self.model_str.split(":")[0].split(",")[0]
 
     def cache(self):
-        pass
-
-    @property
-    @abstractmethod  # make sure this is the inner-most decorator
-    def model_dtype(self):
         pass
 
     @abstractmethod  # make sure this is the inner-most decorator

@@ -36,11 +36,6 @@ class ROM(object):
         self.reduced_basis = reduced_basis
         self.empirical_interpolant = empirical_interpolant
 
-    #        if reduced_basis is None:
-    #            if empirical_interpolant is not None:
-    #                raise Exception
-    #            self.build(tol=tol)
-
     def build(self, do_step=None, tol=DEFAULT_TOLERANCE):
 
         if do_step is None or do_step == "RB":
@@ -204,7 +199,7 @@ class Samples(object):
                 samples = np.load(filename_in)
             elif filename_in.endswith(".csv"):
                 samples = [
-                    np.array([x])
+                    np.atleast_1d(x)
                     for x in np.genfromtxt(filename_in, delimiter=",", comments="#")
                 ]
             else:
@@ -224,9 +219,10 @@ class Samples(object):
         self.random_starting_state = np.random.get_state()
         samples = []
         for _ in range(n_samples):
-            new_sample = np.ndarray(self.model.params.count, dtype=np.float64)
-            for i, param in enumerate(self.model.params):
-                new_sample[i] = self.random.uniform(low=param.min, high=param.max)
+            # new_sample = np.ndarray(self.model.params.count, dtype=np.float64)
+            # for i, param in enumerate(self.model.params):
+            #    new_sample[i] = self.random.uniform(low=param.min, high=param.max)
+            new_sample = self.model.params.generate_random_sample(self.random)
             samples.append(new_sample)
 
         new_samples = self._decompose_samples(samples)

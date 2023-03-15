@@ -1,5 +1,5 @@
 import numpy as np
-import pkg_resources
+import importlib
 import pytest
 from click.testing import CliRunner
 
@@ -15,8 +15,10 @@ def test_PhenomP(tmp_path):
     runner = CliRunner()
     with runner.isolated_filesystem(temp_dir=tmp_path):
 
-        greedy_filename = pkg_resources.resource_filename(
-            "rombus.tests.resources", "LALSuite_test_grid.npy"
+        greedy_filename = str(
+            importlib.resources.files("rombus.tests.resources").joinpath(
+                "LALSuite_test_grid.npy"
+            )
         )
         result = runner.invoke(
             cli,
