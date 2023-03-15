@@ -9,7 +9,7 @@ from rombus.model import RombusModel
 
 class model(RombusModel):
 
-    model_dtype = "complex"
+    model_dtype = complex
 
     params.add("m1", 30, 35)  # noqa F821
     params.add("m2", 30, 35)  # noqa F821

@@ -82,7 +82,7 @@ class _RombusModelMeta(type):
 
         # Initialise the following members↵
         result["params"] = Params()
-        result["model_dtype"] = "float64"
+        result["model_dtype"] = np.dtype("float64")
 
         return result
 
@@ -102,8 +102,8 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         # Check that at least one parameter has beed defined
         assert self.params.count > 0
 
-        # Ensure that model_dtype is a string
-        assert type(self.model_dtype) == str
+        # Ensure that model_dtype is of the right type
+        # assert self.model_dtype.type == np.dtype
 
         # Run an optional init() method
         self.cache()
@@ -117,7 +117,7 @@ class RombusModel(metaclass=_RombusModelABCMeta):
 
         # Keep track of the model string so we can reinstantiate from a saved state
         self.model_str = model_str
-        self.model_basename = self.model_str.split(":")[0].split(",")[0]
+        self.model_basename = self.model_str.split(":")[0].split(".")[-1]
 
     def cache(self):
         pass

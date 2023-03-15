@@ -68,10 +68,7 @@ class ROM(object):
 
     def evaluate(self, params):
         _signal_at_nodes = self.model.compute(params, self.empirical_interpolant.nodes)
-        if self.model.model_dtype == complex:
-            return np.vdot(_signal_at_nodes, self.empirical_interpolant.B_matrix)
-        else:
-            return np.dot(_signal_at_nodes, self.empirical_interpolant.B_matrix)
+        return np.dot(_signal_at_nodes, np.real(self.empirical_interpolant.B_matrix))
 
     def write(self, filename):
         """Save ROM to file"""
@@ -108,7 +105,10 @@ class ROM(object):
     def _validate_and_refine_basis(self, n_random, tol=DEFAULT_TOLERANCE, iterate=True):
 
         n_selected_greedy_points_global = np.iinfo(np.int32).max
-        while n_selected_greedy_points_global > 0:
+
+        n_greedy_last = len(self.reduced_basis.greedypoints)
+        n_greedy_last_global = mpi.COMM.allreduce(n_greedy_last, op=mpi4py.MPI.SUM)
+        while True:
             # generate validation set by randomly sampling the parameter space
             new_samples = Samples(self.model, n_random=n_random)
             my_vs = self.model.generate_model_set(new_samples)
@@ -118,7 +118,12 @@ class ROM(object):
             selected_greedy_points = []
             for i, validation_sample in enumerate(new_samples.samples):
                 if self.model.model_dtype == complex:
-                    proj_error = 1 - np.sum(np.vdot(my_vs[i], RB_transpose) ** 2)
+                    proj_error = 1 - np.sum(
+                        [
+                            np.real(np.conjugate(d_i) * d_i)
+                            for d_i in np.dot(my_vs[i], RB_transpose)
+                        ]
+                    )
                 else:
                     proj_error = 1 - np.sum(np.dot(my_vs[i], RB_transpose) ** 2)
                 if proj_error > tol:
@@ -135,9 +140,17 @@ class ROM(object):
             self.reduced_basis = ReducedBasis().compute(
                 self.model, self.samples, tol=tol
             )
+            n_greedy_new = len(self.reduced_basis.greedypoints)
+            n_greedy_new_global = mpi.COMM.allreduce(n_greedy_new, op=mpi4py.MPI.SUM)
 
-            if not iterate:
+            if not iterate or n_greedy_new_global == n_greedy_last_global:
                 break
+            else:
+                if mpi.RANK_IS_MAIN:
+                    print(
+                        f"Current number of accepted greedy points: {n_greedy_new_global}"
+                    )
+                n_greedy_last_global = n_greedy_new_global
 
 
 class Samples(object):
@@ -296,6 +309,7 @@ class ReducedBasis(object):
 
             # update iteration count
             iter += 1
+        print("\n")
 
         self.matrix = np.asarray(self.matrix)
         self.greedypoints = [samples.samples[i] for i in basis_indicies]

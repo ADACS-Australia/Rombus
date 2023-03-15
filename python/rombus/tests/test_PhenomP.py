@@ -16,15 +16,13 @@ def test_PhenomP(tmp_path):
     with runner.isolated_filesystem(temp_dir=tmp_path):
 
         greedy_filename = str(
-            importlib.resources.files("rombus.tests.resources").joinpath(
-                "LALSuite_test_grid.npy"
-            )
+            importlib.resources.files("rombus.models").joinpath("PhenomP_samples.csv")
         )
         result = runner.invoke(
             cli,
             [
                 "build",
-                "rombus.tests.PhenomP:model",
+                "rombus.models.PhenomP:model",
                 greedy_filename,
             ],
         )
@@ -33,7 +31,7 @@ def test_PhenomP(tmp_path):
             cli,
             [
                 "evaluate",
-                "rombus.tests.PhenomP.hdf5",
+                "PhenomP.hdf5",
                 "m1=23.07487209351506",
                 "m2=29.753779794217984",
                 "chi1L=0.3803919479347709",
