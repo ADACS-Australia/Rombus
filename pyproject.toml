@@ -40,6 +40,7 @@ docs = [
    "Sphinx",
    "sphinx-rtd-theme",
    "myst-parser",
+   "sphinx-click",
 ]
 dev = ["pre-commit",
        "pytest",

@@ -1433,9 +1433,9 @@ test = ["covdefaults (>=2.2.2)", "coverage (>=7.1)", "coverage-enable-subprocess
 
 [extras]
 dev = ["pre-commit", "pytest", "black", "ruff"]
-docs = ["Sphinx", "sphinx-rtd-theme", "myst-parser"]
+docs = ["Sphinx", "sphinx-rtd-theme", "myst-parser", "sphinx-click"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = " >=3.11"
-content-hash = "b4ef7142c4865207186887864c6df05e85a7f4a10cda52488b17b24cedce6b8e"
+content-hash = "3e6c234f30a6aab51351a3445411012b6452ae75c5850c9d9d96863eb8a126e5"
