@@ -123,6 +123,44 @@ def evaluate(ctx, filename_rom, parameters):
     plot.compare_rom_to_true(ROM, model_params)
 
 
+@cli.command(context_settings=FLEX_CONTEXT_SETTINGS)
+@click.argument("filename_ROM", type=str)
+@click.option(
+    "-n",
+    "--n_samples",
+    type=int,
+    default=100,
+    help="Number of samples to use for timing",
+)
+@click.pass_context
+def timing(ctx, filename_rom, n_samples):
+    """Compute timing information for a ROM and it's source model"""
+
+    # Read ROM
+    ROM = core.ROM.from_file(filename_rom)
+
+    # Generate the samples to be used
+    timing_sample = core.Samples(ROM.model, n_random=n_samples)
+
+    # Generate timing information for model
+    timing_model = ROM.model.timing(timing_sample)
+
+    # Generate timing information for ROM
+    timing_ROM = ROM.timing(timing_sample)
+
+    # Report results
+    print(
+        f"Timing information for ROM:   {timing_ROM:.2e}s for {n_samples} calls ({timing_ROM/n_samples:.2e} per sample)."
+    )
+    print(
+        f"Timing information for model: {timing_model:.2e}s for {n_samples} calls ({timing_model/n_samples:.2e} per sample)."
+    )
+    if timing_ROM > timing_model:
+        print(f"ROM is {timing_ROM/timing_model:.2f}X slower than the source model.")
+    else:
+        print(f"ROM is {timing_model/timing_ROM:.2f}X faster than the source model.")
+
+
 if __name__ == "__main__":
     cli(obj={})
     sys.exit()

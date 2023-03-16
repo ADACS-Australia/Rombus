@@ -1,4 +1,5 @@
 import sys
+import timeit
 from typing import List
 
 import h5py
@@ -58,7 +59,7 @@ class ROM(object):
 
         if self.reduced_basis is None:
             self.reduced_basis = ReducedBasis().compute(
-                self.model, Samples(self.model, n_random=n_random, tol=tol)
+                self.model, Samples(self.model, n_random=n_random), tol=tol
             )
         self._validate_and_refine_basis(n_random, tol=tol, iterate=iterate)
 
@@ -101,6 +102,13 @@ class ROM(object):
             reduced_basis=reduced_basis,
             empirical_interpolant=empirical_interpolant,
         )
+
+    def timing(self, samples):
+        start_time = timeit.default_timer()
+        for i, sample in enumerate(samples.samples):
+            params_numpy = self.model.params.np2param(sample)
+            _ = self.evaluate(params_numpy)
+        return timeit.default_timer() - start_time
 
     def _validate_and_refine_basis(self, n_random, tol=DEFAULT_TOLERANCE, iterate=True):
 

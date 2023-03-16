@@ -2,6 +2,7 @@ import importlib
 import sys
 import os
 import shutil
+import timeit
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple, Counter
 from typing import Any, List, Callable
@@ -164,6 +165,13 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         assert Counter(model_params.keys()) == Counter(self.params.names)
 
         return model_params
+
+    def timing(self, samples):
+        start_time = timeit.default_timer()
+        for i, sample in enumerate(samples.samples):
+            params_numpy = self.params.np2param(sample)
+            _ = self.compute(params_numpy, self.domain)
+        return timeit.default_timer() - start_time
 
     @classmethod
     def load(cls, model: str):
