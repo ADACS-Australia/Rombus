@@ -1,270 +1,467 @@
 import sys
-from typing import Dict, List, NamedTuple, Tuple
+import timeit
+from typing import List
 
+import h5py
+import mpi4py
 import numpy as np
-from mpi4py import MPI
-from tqdm.auto import tqdm
 
-import rombus.algorithms as algorithms
-import rombus.misc as misc
-import rombus.plot as plot
+import rombus._core.algorithms as algorithms
+import rombus._core.misc as misc
+import rombus._core.mpi as mpi
+from rombus.model import RombusModel
 
-MAIN_RANK = 0
-
-COMM = MPI.COMM_WORLD
-SIZE = COMM.Get_size()
-RANK = COMM.Get_rank()
-
-random = np.random.default_rng()
+DEFAULT_TOLERANCE = 1e-14
+DEFAULT_REFINE_N_RANDOM = 100
 
 
-def generate_training_set(model, greedypoints: List[np.ndarray]) -> np.ndarray:
-    """returns a list of models (one for each row in 'greedypoints')"""
-
-    domain = model.init_domain()
-
-    my_ts = np.zeros(shape=(len(greedypoints), len(domain)), dtype=model.model_dtype)
-    for i, params_numpy in enumerate(
-        tqdm(greedypoints, desc=f"Generating training set for rank {RANK}")
+class ROM(object):
+    def __init__(
+        self,
+        model,
+        samples,
+        reduced_basis=None,
+        empirical_interpolant=None,
+        tol=DEFAULT_TOLERANCE,
     ):
-        params = model.params_dtype(
-            **dict(zip(model.params, np.atleast_1d(params_numpy)))
-        )
-        model_i = model.compute(params, domain)
-        if model.model_dtype == complex:
-            my_ts[i] = model_i / np.sqrt(np.vdot(model_i, model_i))
-        else:
-            my_ts[i] = model_i / np.sqrt(np.dot(model_i, model_i))
 
-    return my_ts
-
-
-def read_divide_and_send_data_to_ranks(datafile: str) -> Tuple[List[np.ndarray], Dict]:
-    # dividing greedypoints into chunks
-    if RANK == MAIN_RANK:
-        if datafile.endswith(".npy"):
-            greedypoints = np.load(datafile)
-        elif datafile.endswith(".csv"):
-            greedypoints = np.genfromtxt(datafile, delimiter=",")
+        if isinstance(model, str):
+            self.model = RombusModel.load(model)
+        elif isinstance(model, RombusModel):
+            self.model = model
         else:
             raise Exception
-    else:
-        greedypoints = None
 
-    return divide_and_send_data_to_ranks(greedypoints)
+        self.model = model
+        self.samples = samples
+        self.reduced_basis = reduced_basis
+        self.empirical_interpolant = empirical_interpolant
 
+    def build(self, do_step=None, tol=DEFAULT_TOLERANCE):
 
-def divide_and_send_data_to_ranks(
-    greedypoints: List[np.ndarray],
-) -> Tuple[List[np.ndarray], Dict]:
-    chunks = None
-    chunk_counts = None
-    if RANK == MAIN_RANK:
-        chunks = [[] for _ in range(SIZE)]
-        for i, chunk in enumerate(greedypoints):
-            chunks[i % SIZE].append(chunk)
-        chunk_counts = {i: len(chunks[i]) for i in range(len(chunks))}
+        if do_step is None or do_step == "RB":
+            self.reduced_basis = ReducedBasis().compute(
+                self.model, self.samples, tol=tol
+            )
 
-    greedypoints = COMM.scatter(chunks, root=MAIN_RANK)
-    chunk_counts = COMM.bcast(chunk_counts, root=MAIN_RANK)
-    return greedypoints, chunk_counts
+        if do_step is None or do_step == "EI":
+            if self.reduced_basis is None:
+                raise Exception
+            self.empirical_interpolant = EmpiricalInterpolant().compute(
+                self.reduced_basis
+            )
 
+        return self
 
-def init_basis_matrix(init_model):
-    # init the baisis (RB_matrix) with 1 model from the training set to start
-    if RANK == MAIN_RANK:
-        RB_matrix = [init_model]
-    else:
-        RB_matrix = None
-    RB_matrix = COMM.bcast(RB_matrix, root=MAIN_RANK)  # share the basis with ALL nodes
-    return RB_matrix
+    def refine(
+        self, n_random=DEFAULT_REFINE_N_RANDOM, tol=DEFAULT_TOLERANCE, iterate=True
+    ):
 
+        if self.reduced_basis is None:
+            self.reduced_basis = ReducedBasis().compute(
+                self.model, Samples(self.model, n_random=n_random), tol=tol
+            )
+        self._validate_and_refine_basis(n_random, tol=tol, iterate=iterate)
 
-def add_next_model_to_basis(model, RB_matrix, pc_matrix, my_ts, iter):
-    # project training set on basis + get errors
-    pc = misc.project_onto_basis(
-        model, 1.0, RB_matrix, my_ts, iter - 1, model.model_dtype
-    )
-    pc_matrix.append(pc)
-    projection_errors = list(
-        1
-        - np.einsum(
-            "ij,ij->i", np.array(np.conjugate(pc_matrix)).T, np.array(pc_matrix).T
-        )
-    )
+        self.empirical_interpolant = EmpiricalInterpolant().compute(self.reduced_basis)
 
-    # gather all errors (below is a list[ rank0_errors, rank1_errors...])
-    all_rank_errors = COMM.gather(projection_errors, root=MAIN_RANK)
+        return self
 
-    # determine highest error
-    if RANK == MAIN_RANK:
-        error_data = misc.get_highest_error(all_rank_errors)
-        err_rank, err_idx, error = error_data
-    else:
-        error_data = None, None, None
-    error_data = COMM.bcast(
-        error_data, root=MAIN_RANK
-    )  # share the error data with all nodes
-    err_rank, err_idx, error = error_data
+    def evaluate(self, params):
+        _signal_at_nodes = self.model.compute(params, self.empirical_interpolant.nodes)
+        return np.dot(_signal_at_nodes, np.real(self.empirical_interpolant.B_matrix))
 
-    # get model with the worst error
-    worst_model = None
-    if err_rank == MAIN_RANK:
-        worst_model = my_ts[err_idx]  # no need to send
-    elif RANK == err_rank:
-        worst_model = my_ts[err_idx]
-        COMM.send(worst_model, dest=MAIN_RANK)
-    if worst_model is None and RANK == MAIN_RANK:
-        worst_model = COMM.recv(source=err_rank)
+    def write(self, filename):
+        """Save ROM to file"""
+        with h5py.File(filename, "w") as h5file:
+            self.model.write(h5file)
+            self.samples.write(h5file)
+            if self.reduced_basis is not None:
+                self.reduced_basis.write(h5file)
+            if self.empirical_interpolant is not None:
+                self.empirical_interpolant.write(h5file)
 
-    # adding worst model to basis
-    if RANK == MAIN_RANK:
-        # Gram-Schmidt to get the next basis and normalize
-        RB_matrix.append(misc.IMGS(model, RB_matrix, worst_model, iter))
-
-    # share the basis with ALL nodes
-    RB_matrix = COMM.bcast(RB_matrix, root=MAIN_RANK)
-    return RB_matrix, pc_matrix, error_data
-
-
-def loop_log(iter, err_rnk, err_idx, err):
-    m = f">>> Iter {iter:003}: err {err:.1E} (rank {err_rnk:002}@idx{err_idx:003})"
-    sys.stdout.write("\033[K" + m + "\r")
-
-
-def convert_to_basis_index(rank_number, rank_idx, rank_counts):
-    ranks_till_err_rank = [i for i in range(rank_number)]
-    idx_till_err_rank = np.sum([rank_counts[i] for i in ranks_till_err_rank])
-    return int(rank_idx + idx_till_err_rank)
-
-
-def ROM(model, params: NamedTuple, domain, basis):
-    _signal_at_nodes = model.compute(params, domain)
-    return np.dot(_signal_at_nodes, basis)
-
-
-def generate_random_samples(model, n_samples):
-    samples = []
-    for _ in range(n_samples):
-        new_sample = np.ndarray(len(model.params), dtype=model.model_dtype)
-        for i in range(len(model.params)):
-            new_sample[i] = random.random() * 10.0
-        samples.append(new_sample)
-    return samples
-
-
-def validate_and_refine_basis(
-    model, RB_matrix, selected_greedy_points, tol, N_validations, write_results=True
-):
-
-    # generate validation set by randomly sampling the parameter space
-    # need to think about how to do sampling, but this can be the same function
-    # as the greedy points
-    random_samples = generate_random_samples(model, N_validations)
-    validation_samples, chunk_counts = divide_and_send_data_to_ranks(random_samples)
-
-    my_vs = generate_training_set(model, validation_samples)
-
-    n_added = 0
-    RB_transpose = np.transpose(RB_matrix)
-    for i, validation_sample in enumerate(validation_samples):
-        if model.model_dtype == complex:
-            proj_error = 1 - np.sum(np.vdot(my_vs[i], RB_transpose) ** 2)
+    @classmethod
+    def from_file(cls, file_in):
+        """Create a ROM instance from a file"""
+        close_file = False
+        if not isinstance(file_in, str):
+            h5file = file_in
         else:
-            proj_error = 1 - np.sum(np.dot(my_vs[i], RB_transpose) ** 2)
-        if proj_error > tol:
-            selected_greedy_points.append(validation_sample)
-            n_added = n_added + 1
-    if RANK == MAIN_RANK:
-        print(f"Number of samples added: {n_added}")
-
-    # add the inaccurate points to the original selected greedy
-    # points and remake the basis
-    RB_updated, selected_greedy_points = make_reduced_basis(
-        model, selected_greedy_points, chunk_counts, write_results=write_results
-    )
-
-    return RB_updated, selected_greedy_points
-
-
-def refine(model, greedypoints, chunk_counts, tol=1e-4, N_validations=200):
-
-    RB, selected_greedy_points = make_reduced_basis(
-        model, greedypoints, chunk_counts, write_results=False
-    )
-    Refined_RB, _ = validate_and_refine_basis(
-        model, RB, selected_greedy_points, tol, N_validations, write_results=False
-    )
-
-    np.save("RB_matrix", Refined_RB)
-    EI = make_empirical_interpolant(model)
-
-    # Write results
-    np.save("EI", EI)
-
-    return 0
-
-
-def make_reduced_basis(model, greedypoints, chunk_counts, write_results=True):
-    """Make reduced basis
-
-    FILENAME_IN is the 'greedy points' numpy file to take as input
-    """
-
-    my_ts = generate_training_set(model, greedypoints)
-    RB_matrix = init_basis_matrix(
-        my_ts[0]
-    )  # hardcoding 1st model to be used to start the basis
-
-    error_list = []
-    error = np.inf
-    iter = 1
-    basis_indicies = [0]  # we've used the 1st model already
-    pc_matrix = []
-    if RANK == MAIN_RANK:
-        print("Filling basis with greedy-algorithm")
-    while error > 1e-14:
-        RB_matrix, pc_matrix, error_data = add_next_model_to_basis(
-            model, RB_matrix, pc_matrix, my_ts, iter
+            h5file = h5py.File(file_in, "r")
+            close_file = True
+        model = RombusModel.from_file(h5file)
+        samples = Samples.from_file(h5file)
+        reduced_basis = ReducedBasis.from_file(h5file)
+        empirical_interpolant = EmpiricalInterpolant.from_file(h5file)
+        if close_file:
+            h5file.close()
+        return cls(
+            model,
+            samples,
+            reduced_basis=reduced_basis,
+            empirical_interpolant=empirical_interpolant,
         )
-        err_rnk, err_idx, error = error_data
 
-        # log and cache some data
-        loop_log(iter, err_rnk, err_idx, error)
+    def timing(self, samples):
+        start_time = timeit.default_timer()
+        for i, sample in enumerate(samples.samples):
+            params_numpy = self.model.params.np2param(sample)
+            _ = self.evaluate(params_numpy)
+        return timeit.default_timer() - start_time
 
-        basis_index = convert_to_basis_index(err_rnk, err_idx, chunk_counts)
-        error_list.append(error)
-        basis_indicies.append(basis_index)
+    def _validate_and_refine_basis(self, n_random, tol=DEFAULT_TOLERANCE, iterate=True):
 
-        # update iteration count
-        iter += 1
+        n_selected_greedy_points_global = np.iinfo(np.int32).max
 
-    if RANK == MAIN_RANK:
-        print("\nBasis generation complete!")
-        if write_results:
-            np.save("RB_matrix", RB_matrix)
-            plot.errors(error_list)
-            plot.basis(RB_matrix)
+        n_greedy_last = len(self.reduced_basis.greedypoints)
+        n_greedy_last_global = mpi.COMM.allreduce(n_greedy_last, op=mpi4py.MPI.SUM)
+        while True:
+            # generate validation set by randomly sampling the parameter space
+            new_samples = Samples(self.model, n_random=n_random)
+            my_vs = self.model.generate_model_set(new_samples)
 
-    greedypoints_keep = [greedypoints[i] for i in basis_indicies]
-    return RB_matrix, greedypoints_keep
+            # test validation set
+            RB_transpose = np.transpose(self.reduced_basis.matrix)
+            selected_greedy_points = []
+            for i, validation_sample in enumerate(new_samples.samples):
+                if self.model.model_dtype == complex:
+                    proj_error = 1 - np.sum(
+                        [
+                            np.real(np.conjugate(d_i) * d_i)
+                            for d_i in np.dot(my_vs[i], RB_transpose)
+                        ]
+                    )
+                else:
+                    proj_error = 1 - np.sum(np.dot(my_vs[i], RB_transpose) ** 2)
+                if proj_error > tol:
+                    selected_greedy_points.append(validation_sample)
+            n_selected_greedy_points_global = mpi.COMM.allreduce(
+                len(selected_greedy_points), op=mpi4py.MPI.SUM
+            )
+            if mpi.RANK_IS_MAIN:
+                print(f"Number of samples added: {n_selected_greedy_points_global}")
+
+            # add the inaccurate points to the original selected greedy
+            # points and remake the basis
+            self.samples.extend(selected_greedy_points)
+            self.reduced_basis = ReducedBasis().compute(
+                self.model, self.samples, tol=tol
+            )
+            n_greedy_new = len(self.reduced_basis.greedypoints)
+            n_greedy_new_global = mpi.COMM.allreduce(n_greedy_new, op=mpi4py.MPI.SUM)
+
+            if not iterate or n_greedy_new_global == n_greedy_last_global:
+                break
+            else:
+                if mpi.RANK_IS_MAIN:
+                    print(
+                        f"Current number of accepted greedy points: {n_greedy_new_global}"
+                    )
+                n_greedy_last_global = n_greedy_new_global
 
 
-def make_empirical_interpolant(model):
-    """Make empirical interpolant"""
+class Samples(object):
+    def __init__(self, model, filename=None, n_random=0):
 
-    RB = np.load("RB_matrix.npy")
+        self.model = model
 
-    RB = RB[0 : len(RB)]
-    eim = algorithms.StandardEIM(RB.shape[0], RB.shape[1])
+        # Needed for random number generation
+        self.n_random = n_random
+        self.random = None
+        self.random_starting_state = None
 
-    eim.make(RB)
+        # Initialise samples
+        self.n_samples = 0
+        self.samples = []
+        if filename:
+            self._add_from_file(filename)
+        if self.n_random > 0:
+            self._add_random_samples(self.n_random)
 
-    domain = model.init_domain()
+    def extend(self, new_samples):
 
-    nodes = domain[eim.indices]
+        self.samples.extend(new_samples)
+        self.n_samples = self.n_samples + len(new_samples)
 
-    nodes, B = zip(*sorted(zip(nodes, eim.B)))
+    def write(self, h5file):
+        """Save samples to file"""
 
-    np.save("B_matrix", B)
-    np.save("nodes", nodes)
+        h5_group = h5file.create_group("samples")
+        self.model.write(h5_group)
+        h5_group.create_dataset("samples", data=self.samples)
+        h5_group.create_dataset("n_samples", data=self.n_samples)
+
+    @classmethod
+    def from_file(cls, file_in):
+        """Create a ROM instance from a file"""
+
+        close_file = False
+        if not isinstance(file_in, str):
+            h5file = file_in
+        else:
+            h5file = h5py.File(file_in, "r")
+            close_file = True
+
+        model_str = h5file["samples/model/model_str"].asstr()[()]
+        model = RombusModel.load(model_str)
+        samples = cls(model)
+        samples.samples = [np.array(x) for x in h5file["samples/samples"]]
+        samples.n_samples = np.int32(h5file["samples/n_samples"])
+        if close_file:
+            h5file.close()
+        return samples
+
+    def _add_from_file(self, filename_in: str):
+
+        # dividing greedypoints into chunks
+        if mpi.RANK_IS_MAIN:
+            if filename_in.endswith(".npy"):
+                samples = np.load(filename_in)
+            elif filename_in.endswith(".csv"):
+                samples = [
+                    np.atleast_1d(x)
+                    for x in np.genfromtxt(filename_in, delimiter=",", comments="#")
+                ]
+            else:
+                raise Exception
+        else:
+            samples = None
+
+        new_samples = self._decompose_samples(samples)
+        n_new_samples = len(new_samples)
+
+        self.samples.extend(new_samples)
+        self.n_samples = self.n_samples + n_new_samples
+
+    def _add_random_samples(self, n_samples):
+
+        self.random = np.random.default_rng()
+        self.random_starting_state = np.random.get_state()
+        samples = []
+        for _ in range(n_samples):
+            # new_sample = np.ndarray(self.model.params.count, dtype=np.float64)
+            # for i, param in enumerate(self.model.params):
+            #    new_sample[i] = self.random.uniform(low=param.min, high=param.max)
+            new_sample = self.model.params.generate_random_sample(self.random)
+            samples.append(new_sample)
+
+        new_samples = self._decompose_samples(samples)
+        n_new_samples = len(new_samples)
+
+        self.samples.extend(new_samples)
+        self.n_samples = self.n_samples + n_new_samples
+
+    def _decompose_samples(
+        self,
+        samples: List[np.ndarray],
+    ):
+        chunks = None
+        if mpi.RANK_IS_MAIN:
+            chunks = [[] for _ in range(mpi.SIZE)]
+            for i, chunk in enumerate(samples):
+                chunks[i % mpi.SIZE].append(chunk)
+
+        return mpi.COMM.scatter(chunks, root=mpi.MAIN_RANK)
+
+
+class ReducedBasis(object):
+    def __init__(self, matrix=[], greedypoints=[], error_list=[]):
+        """Make reduced basis
+
+        FILENAME_IN is the 'greedy points' numpy file to take as input
+        """
+
+        self.matrix = matrix
+        self.greedypoints = greedypoints
+        self.error_list = error_list
+
+    def compute(self, model, samples, tol=DEFAULT_TOLERANCE):
+
+        if isinstance(model, str):
+            self.model = RombusModel.load(model)
+        elif isinstance(model, RombusModel):
+            self.model = model
+        else:
+            raise Exception
+
+        # Compute the model for each given sample
+        my_ts = model.generate_model_set(samples)
+
+        if mpi.RANK_IS_MAIN:
+            print("Filling basis with greedy-algorithm")
+
+        # hardcoding 1st model to be used to start the basis
+        self._init_matrix(my_ts[0])
+        basis_indicies = [0]
+
+        # NOTE: NEED TO FIX; THE FIRST INDEX IS BEING ADDED TWICE HERE!
+        error = np.inf
+        iter = 1
+        pc_matrix = []
+        while error > tol:
+            self.matrix, pc_matrix, error_data = self._add_next_model_to_basis(
+                pc_matrix, my_ts, iter
+            )
+            err_rnk, err_idx, error = error_data
+
+            # log and cache some data
+            m = f">>> Iter {iter:003}: err {error:.1E} (rank {err_rnk:002}@idx{err_idx:003})"
+            sys.stdout.write("\033[K" + m + "\r")
+
+            basis_index = self._convert_to_basis_index(
+                err_rnk, err_idx, samples.n_samples
+            )
+            self.error_list.append(error)
+            basis_indicies.append(basis_index)
+
+            # update iteration count
+            iter += 1
+        print("\n")
+
+        self.matrix = np.asarray(self.matrix)
+        self.greedypoints = [samples.samples[i] for i in basis_indicies]
+        self.error_list = np.asarray(self.error_list)
+
+        return self
+
+        # if mpi.RANK_IS_MAIN:
+        #    print("\nBasis generation complete!")
+        #    if write_results:
+        #        np.save("matrix", matrix)
+        #        plot.errors(error_list)
+        #        plot.basis(matrix)
+
+    def write(self, h5file):
+        """Save samples to file"""
+
+        h5_group = h5file.create_group("reduced_basis")
+        h5_group.create_dataset("matrix", data=self.matrix)
+        h5_group.create_dataset("greedypoints", data=self.greedypoints)
+        h5_group.create_dataset("error_list", data=self.error_list)
+
+    @classmethod
+    def from_file(cls, file_in):
+        """Create a ROM instance from a file"""
+
+        close_file = False
+        if not isinstance(file_in, str):
+            h5file = file_in
+        else:
+            h5file = h5py.File(file_in, "r")
+            close_file = True
+
+        matrix = np.array(h5file["reduced_basis/matrix"])
+        greedypoints = [np.array(x) for x in h5file["reduced_basis/greedypoints"]]
+        error_list = np.array(h5file["reduced_basis/error_list"])
+        if close_file:
+            h5file.close()
+        return cls(matrix=matrix, greedypoints=greedypoints, error_list=error_list)
+
+    def _add_next_model_to_basis(self, pc_matrix, my_ts, iter):
+        # project training set on basis + get errors
+        pc = misc.project_onto_basis(
+            1.0, self.matrix, my_ts, iter - 1, self.model.model_dtype
+        )
+        pc_matrix.append(pc)
+
+        projection_errors = list(
+            1
+            - np.einsum(
+                "ij,ij->i", np.array(np.conjugate(pc_matrix)).T, np.array(pc_matrix).T
+            )
+        )
+
+        # gather all errors (below is a list[ rank0_errors, rank1_errors...])
+        all_rank_errors = mpi.COMM.gather(projection_errors, root=mpi.MAIN_RANK)
+
+        # determine highest error
+        if mpi.RANK_IS_MAIN:
+            error_data = misc.get_highest_error(all_rank_errors)
+            err_rank, err_idx, error = error_data
+        else:
+            error_data = None, None, None
+        error_data = mpi.COMM.bcast(
+            error_data, root=mpi.MAIN_RANK
+        )  # share the error data with all nodes
+        err_rank, err_idx, error = error_data
+
+        # get model with the worst error
+        worst_model = None
+        if err_rank == mpi.MAIN_RANK:
+            worst_model = my_ts[err_idx]  # no need to send
+        elif mpi.RANK == err_rank:
+            worst_model = my_ts[err_idx]
+            mpi.COMM.send(worst_model, dest=mpi.MAIN_RANK)
+        if worst_model is None and mpi.RANK_IS_MAIN:
+            worst_model = mpi.COMM.recv(source=err_rank)
+
+        # adding worst model to basis
+        if mpi.RANK_IS_MAIN:
+            # Gram-Schmidt to get the next basis and normalize
+            self.matrix.append(misc.IMGS(self.matrix, worst_model, iter))
+
+        # share the basis with ALL nodes
+        matrix = mpi.COMM.bcast(self.matrix, root=mpi.MAIN_RANK)
+        return matrix, pc_matrix, error_data
+
+    def _convert_to_basis_index(self, rank_number, rank_idx, rank_count):
+        ranks_till_err_rank = [i for i in range(rank_number)]
+        idx_till_err_rank = np.sum([rank_count[i] for i in ranks_till_err_rank])
+        return int(rank_idx + idx_till_err_rank)
+
+    def _init_matrix(self, init_model):
+        # init the baisis (matrix) with 1 model from the training set to start
+        if mpi.RANK_IS_MAIN:
+            self.matrix = [init_model]
+        else:
+            self.matrix = None
+        # share the basis with ALL nodes
+        self.matrix = mpi.COMM.bcast(self.matrix, root=mpi.MAIN_RANK)
+
+
+class EmpiricalInterpolant(object):
+    def __init__(self, B_matrix=None, nodes=None):
+        """Initialise empirical interpolant"""
+
+        self.B_matrix = B_matrix
+        self.nodes = nodes
+
+    def compute(self, reduced_basis):
+        """Compute empirical interpolant"""
+
+        # RB = RB[0 : len(RB)]
+        if mpi.RANK_IS_MAIN:
+            print("Computing empirical interpolant")
+        eim = algorithms.StandardEIM(
+            reduced_basis.matrix.shape[0], reduced_basis.matrix.shape[1]
+        )
+        eim.make(reduced_basis.matrix)
+        domain = reduced_basis.model.domain
+        self.nodes = domain[eim.indices]
+        self.nodes, self.B_matrix = zip(*sorted(zip(self.nodes, eim.B)))
+
+        return self
+
+    def write(self, h5file):
+        """Save empirical interpolant to file"""
+
+        h5_group = h5file.create_group("empirical_interpolant")
+        h5_group.create_dataset("B_matrix", data=self.B_matrix)
+        h5_group.create_dataset("nodes", data=self.nodes)
+
+    @classmethod
+    def from_file(cls, file_in):
+        """Create a ROM instance from a file"""
+
+        close_file = False
+        if not isinstance(file_in, str):
+            h5file = file_in
+        else:
+            h5file = h5py.File(file_in, "r")
+            close_file = True
+        B_matrix = np.array(h5file["empirical_interpolant/B_matrix"])
+        nodes = np.array(h5file["empirical_interpolant/nodes"])
+        if close_file:
+            h5file.close()
+        return cls(B_matrix=B_matrix, nodes=nodes)

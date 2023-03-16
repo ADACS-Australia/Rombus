@@ -9,6 +9,10 @@
    notes_for_developers
    {{ project }}
 
+.. click:: rombus.cli:cli
+   :prog: rombus
+   :show-nested:
+
 Index
 =====
 * :ref:`genindex`

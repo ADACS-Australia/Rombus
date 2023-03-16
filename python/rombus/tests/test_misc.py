@@ -1,4 +1,4 @@
-from rombus import misc
+from rombus._core import misc
 
 
 def test_highest_error():

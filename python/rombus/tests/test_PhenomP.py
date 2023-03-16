@@ -1,9 +1,9 @@
 import numpy as np
-import pkg_resources
+import importlib
 import pytest
 from click.testing import CliRunner
 
-from rombus.scripts.cli import cli
+from rombus.cli import cli
 
 
 @pytest.mark.lalsuite
@@ -15,14 +15,14 @@ def test_PhenomP(tmp_path):
     runner = CliRunner()
     with runner.isolated_filesystem(temp_dir=tmp_path):
 
-        greedy_filename = pkg_resources.resource_filename(
-            "rombus.tests.resources", "LALSuite_test_grid.npy"
+        greedy_filename = str(
+            importlib.resources.files("rombus.models").joinpath("PhenomP_samples.csv")
         )
         result = runner.invoke(
             cli,
             [
-                "rombus.tests.PhenomP:model",
                 "build",
+                "rombus.models.PhenomP:model",
                 greedy_filename,
             ],
         )
@@ -30,8 +30,8 @@ def test_PhenomP(tmp_path):
         result = runner.invoke(
             cli,
             [
-                "rombus.tests.PhenomP:model",
                 "evaluate",
+                "PhenomP.hdf5",
                 "m1=23.07487209351506",
                 "m2=29.753779794217984",
                 "chi1L=0.3803919479347709",

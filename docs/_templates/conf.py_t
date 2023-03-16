@@ -104,3 +104,14 @@ intersphinx_mapping = {
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
 {%- endif %}
+
+# Handler for excluding modules, classes, etc from documentation
+# Presently, this just passes through the default behavior
+def autodoc_skip_member_handler(app, what, name, obj, skip, options):
+    # Include everything else
+    return skip # True if you want to exclude; False if you don't
+
+# Automatically called by sphinx at startup
+def setup(app):
+    # Connect the autodoc-skip-member event from apidoc to the callback
+    app.connect('autodoc-skip-member', autodoc_skip_member_handler)

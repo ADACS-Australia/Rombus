@@ -11,7 +11,7 @@ from scipy.interpolate import splev, splrep
 # from scipy.optimize import curve_fit
 from scipy.optimize import leastsq
 
-from rombus import lib
+from . import lib
 
 ##############################################
 # The following three functions (_general_function, _weighted_general_function,

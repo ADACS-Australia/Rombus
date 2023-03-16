@@ -15,9 +15,9 @@ import time
 
 import numpy as np
 
-import rombus.eim as eim
-import rombus.greedy as greedy
-import rombus.lib as lib
+from . import eim
+from . import greedy
+from . import lib
 
 
 ##############################################
