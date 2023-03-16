@@ -4,10 +4,7 @@ import numpy as np
 def dot_product(model, weights, a, b):
 
     assert len(a) == len(b)
-    if model.model_dtype == complex:
-        return np.vdot(a * weights, b)
-    else:
-        return np.dot(a * weights, b)
+    return np.vdot(a * weights, b)
 
 
 def project_onto_basis(model, integration_weights, RB, my_ts, iter, dtype):
@@ -23,15 +20,9 @@ def MGS(model, RB, next_vec, iter):
     dim_RB = iter
     for i in range(dim_RB):
         # --- ortho_basis = ortho_basis - L2_proj*basis; ---
-        if model.model_dtype == complex:
-            L2 = np.vdot(RB[i], next_vec)
-        else:
-            L2 = np.dot(RB[i], next_vec)
+        L2 = np.vdot(RB[i], next_vec)
         next_vec -= RB[i] * L2
-    if model.model_dtype == complex:
-        norm = np.sqrt(np.vdot(next_vec, next_vec))
-    else:
-        norm = np.sqrt(np.dot(next_vec, next_vec))
+    norm = np.sqrt(np.vdot(next_vec, next_vec))
     next_vec /= norm
     return next_vec, norm
 
@@ -39,10 +30,7 @@ def MGS(model, RB, next_vec, iter):
 def IMGS(model, RB, next_vec, iter):
     """what is this doing?"""
     ortho_condition = 0.5
-    if model.model_dtype == complex:
-        norm_prev = np.sqrt(np.vdot(next_vec, next_vec))
-    else:
-        norm_prev = np.sqrt(np.dot(next_vec, next_vec))
+    norm_prev = np.sqrt(np.vdot(next_vec, next_vec))
     flag = False
     while not flag:
         next_vec, norm_current = MGS(model, RB, next_vec, iter)
@@ -51,10 +39,7 @@ def IMGS(model, RB, next_vec, iter):
             norm_prev = norm_current
         else:
             flag = True
-        if model.model_dtype == complex:
-            norm_current = np.sqrt(np.vdot(next_vec, next_vec))
-        else:
-            norm_current = np.sqrt(np.dot(next_vec, next_vec))
+        norm_current = np.sqrt(np.vdot(next_vec, next_vec))
         next_vec /= norm_current
     # RB[iter] = next_vec  # np.vstack((RB, next_vec))
     # return RB[iter]
