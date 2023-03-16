@@ -353,9 +353,10 @@ class ReducedBasis(object):
     def _add_next_model_to_basis(self, pc_matrix, my_ts, iter):
         # project training set on basis + get errors
         pc = misc.project_onto_basis(
-            self.model, 1.0, self.matrix, my_ts, iter - 1, self.model.model_dtype
+            1.0, self.matrix, my_ts, iter - 1, self.model.model_dtype
         )
         pc_matrix.append(pc)
+
         projection_errors = list(
             1
             - np.einsum(
@@ -390,7 +391,7 @@ class ReducedBasis(object):
         # adding worst model to basis
         if mpi.RANK_IS_MAIN:
             # Gram-Schmidt to get the next basis and normalize
-            self.matrix.append(misc.IMGS(self.model, self.matrix, worst_model, iter))
+            self.matrix.append(misc.IMGS(self.matrix, worst_model, iter))
 
         # share the basis with ALL nodes
         matrix = mpi.COMM.bcast(self.matrix, root=mpi.MAIN_RANK)

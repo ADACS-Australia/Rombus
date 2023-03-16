@@ -1,21 +1,24 @@
 import numpy as np
 
 
-def dot_product(model, weights, a, b):
+def dot_product(weights, a, b):
 
     assert len(a) == len(b)
     return np.vdot(a * weights, b)
 
 
-def project_onto_basis(model, integration_weights, RB, my_ts, iter, dtype):
+def project_onto_basis(integration_weights, e, my_ts, iter, dtype):
 
+    # c = np.einsum('i,ji->j', integration_weights*e[iter].conjugate(), h)
     pc = np.zeros(len(my_ts), dtype=dtype)
+    # projections += np.outer(c,e[iter])
     for j in range(len(my_ts)):
-        pc[j] = dot_product(model, integration_weights, RB[iter], my_ts[j])
+        pc[j] = dot_product(integration_weights, e[iter], my_ts[j])
+        # projections[j] += pc[j][iter]*e[iter]
     return pc
 
 
-def MGS(model, RB, next_vec, iter):
+def MGS(RB, next_vec, iter):
     """what is this doing?"""
     dim_RB = iter
     for i in range(dim_RB):
@@ -27,13 +30,13 @@ def MGS(model, RB, next_vec, iter):
     return next_vec, norm
 
 
-def IMGS(model, RB, next_vec, iter):
+def IMGS(RB, next_vec, iter):
     """what is this doing?"""
     ortho_condition = 0.5
     norm_prev = np.sqrt(np.vdot(next_vec, next_vec))
     flag = False
     while not flag:
-        next_vec, norm_current = MGS(model, RB, next_vec, iter)
+        next_vec, norm_current = MGS(RB, next_vec, iter)
         next_vec *= norm_current
         if norm_current / norm_prev <= ortho_condition:
             norm_prev = norm_current

@@ -140,10 +140,7 @@ class RombusModel(metaclass=_RombusModelABCMeta):
             tqdm(samples.samples, desc=f"Generating training set for rank {mpi.RANK}")
         ):
             model_i = self.compute(self.params.np2param(params_numpy), self.domain)
-            if self.model_dtype == complex:
-                my_ts[i] = model_i / np.sqrt(np.vdot(model_i, model_i))
-            else:
-                my_ts[i] = model_i / np.sqrt(np.dot(model_i, model_i))
+            my_ts[i] = model_i / np.sqrt(np.vdot(model_i, model_i))
 
         return my_ts
 
