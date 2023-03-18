@@ -4,10 +4,11 @@ import click
 
 import collections
 
-import rombus.core as core
 import rombus.plot as plot
 
 from rombus.model import RombusModel
+from rombus.samples import Samples
+from rombus.reduced_order_model import ReducedOrderModel
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 FLEX_CONTEXT_SETTINGS = dict(
@@ -76,10 +77,10 @@ def build(ctx, model, filename_samples, out, do_step):
     model = RombusModel.load(model)
 
     # Load samples
-    samples = core.Samples(model, filename=filename_samples)
+    samples = Samples(model, filename=filename_samples)
 
     # Build ROM
-    ROM = core.ROM(model, samples).build(do_step=do_step)
+    ROM = ReducedOrderModel(model, samples).build(do_step=do_step)
 
     # Write ROM
     if out == "MODEL_BASENAME.hdf5":
@@ -96,7 +97,7 @@ def refine(ctx, filename_rom):
     """Refine parameter sampling to impove a reduced order model"""
 
     # Build model and refine it
-    ROM = core.ROM.from_file(filename_rom).refine()
+    ROM = ReducedOrderModel.from_file(filename_rom).refine()
 
     # Write results
     filename_split = filename_rom.rsplit(".", 1)
@@ -114,7 +115,7 @@ def evaluate(ctx, filename_rom, parameters):
     PARAMETERS is a list of parameter values of the form A=VAL B=VAL ..."""
 
     # Read ROM
-    ROM = core.ROM.from_file(filename_rom)
+    ROM = ReducedOrderModel.from_file(filename_rom)
 
     # Parse the model parameters, which should have been given as arguments
     model_params = ROM.model.parse_cli_params(parameters)
@@ -137,10 +138,10 @@ def timing(ctx, filename_rom, n_samples):
     """Compute timing information for a ROM and it's source model"""
 
     # Read ROM
-    ROM = core.ROM.from_file(filename_rom)
+    ROM = ReducedOrderModel.from_file(filename_rom)
 
     # Generate the samples to be used
-    timing_sample = core.Samples(ROM.model, n_random=n_samples)
+    timing_sample = Samples(ROM.model, n_random=n_samples)
 
     # Generate timing information for model
     timing_model = ROM.model.timing(timing_sample)
