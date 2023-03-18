@@ -34,22 +34,14 @@
 {{ automodule(pkgname, automodule_options) }}
 {% endif %}
 
-{%- if subpackages %}
-.. rubric:: Subpackages
-
-{{ toctree(subpackages) }}
-{% endif %}
-
 {%- if submodules %}
-.. rubric:: Submodules
-
+Submodules
+----------
 {% if separatemodules %}
 {{ toctree(submodules) }}
 {% else %}
 {%- for submodule in submodules %}
-{% if show_headings %}
-{{- [submodule, "module"] | join(" ") | e | heading(2) }}
-{% endif %}
+{{- submodule | heading(3) }}
 {{ automodule(submodule, automodule_options) }}
 {% endfor %}
 {%- endif %}
