@@ -1,48 +1,18 @@
-{%- macro automodule(modname, options) -%}
+{{ [pkgname," API Documentation"] | join | heading(1) }}
+
+{% macro automodule(modname, options) -%}
 .. automodule:: {{ modname }}
 {%- for option in options %}
    :{{ option }}:
 {%- endfor %}
 {%- endmacro %}
-
-{%- macro toctree(docnames) -%}
-.. toctree::
-{% for docname in docnames %}
-   {{ docname }}
-{%- endfor %}
-{%- endmacro %}
-
-{%- if is_namespace %}
-{{- [pkgname, "namespace"] | join(" ") | e | heading }}
-{% else %}
-{{- [pkgname] | join(" ") | e | heading }}
-{% endif %}
-
-{%- if is_namespace %}
-.. py:module:: {{ pkgname }}
-{% endif %}
-
-{%- if modulefirst and not is_namespace %}
-{{ automodule(pkgname, automodule_options) }}
-{% endif %}
-
-{%- if not modulefirst and not is_namespace %}
-{#
-.. rubric:: Module Contents
-
-#}
-{{ automodule(pkgname, automodule_options) }}
-{% endif %}
+{{- automodule(pkgname, automodule_options) }}
 
 {%- if submodules %}
-Submodules
-----------
-{% if separatemodules %}
-{{ toctree(submodules) }}
-{% else %}
-{%- for submodule in submodules %}
-{{- submodule | heading(3) }}
+
+{{ 'Submodules' | heading(2) }}
+{% for submodule in submodules %}
+{{ submodule | heading(3) }}
 {{ automodule(submodule, automodule_options) }}
 {% endfor %}
-{%- endif %}
 {%- endif %}
