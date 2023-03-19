@@ -7,7 +7,7 @@ import numpy as np
 import rombus._core.mpi as mpi
 from rombus.model import RombusModel
 from rombus.samples import Samples
-from rombus.empirical_interpolant import EmpiricalInterpolant
+from rombus.ei import EmpiricalInterpolant
 from rombus.reduced_basis import ReducedBasis
 
 DEFAULT_TOLERANCE = 1e-14

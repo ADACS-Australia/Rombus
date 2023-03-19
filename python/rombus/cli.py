@@ -8,7 +8,7 @@ import rombus.plot as plot
 
 from rombus.model import RombusModel
 from rombus.samples import Samples
-from rombus.ROM import ReducedOrderModel
+from rombus.rom import ReducedOrderModel
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 FLEX_CONTEXT_SETTINGS = dict(
