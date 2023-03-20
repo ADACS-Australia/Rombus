@@ -1,3 +1,4 @@
+from __future__ import annotations
 import importlib
 import sys
 import os
@@ -5,17 +6,22 @@ import shutil
 import timeit
 from abc import ABCMeta, abstractmethod
 from collections import Counter
-from typing import Any, List
+from typing import Any, Dict, List, Self, Tuple
 from tqdm.auto import tqdm
 
-import h5py
 import numpy as np
 
 import rombus._core.mpi as mpi
+import rombus._core.hdf5 as hdf5
 from rombus.params import Params
+from rombus.samples import Samples
 
 
 class _RombusModelMeta(type):
+
+    params: Params
+    model_dtype: np.dtype
+
     def __prepare__(name, *args, **kwargs):
         """Initialise the dictionary that gets passed to __new___.
 
@@ -44,7 +50,14 @@ class _RombusModelABCMeta(_RombusModelMeta, ABCMeta):
 
 
 class RombusModel(metaclass=_RombusModelABCMeta):
-    def __init__(self, model_str):
+    """Baseclass from which all user-defined models should inherit.
+
+    Attributes:
+        params      Model parameters
+        model_dtype Datatype returned by model's compute method
+    """
+
+    def __init__(self, model: str) -> None:
 
         # Check that at least one parameter has beed defined
         assert self.params.count > 0
@@ -63,18 +76,18 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         assert self.n_domain > 0
 
         # Keep track of the model string so we can reinstantiate from a saved state
-        self.model_str = model_str
+        self.model_str = model
         self.model_basename = self.model_str.split(":")[0].split(".")[-1]
 
+    @abstractmethod  # make sure this is the inner-most decorator
+    def set_domain(self) -> None:
+        pass
+
+    @abstractmethod  # make sure this is the inner-most decorator
+    def compute(self, params: np.ndarray, domain: np.ndarray) -> np.ndarray:
+        pass
+
     def cache(self):
-        pass
-
-    @abstractmethod  # make sure this is the inner-most decorator
-    def set_domain(self):
-        pass
-
-    @abstractmethod  # make sure this is the inner-most decorator
-    def compute(self, params: np.ndarray, domain) -> np.ndarray:
         pass
 
     def generate_model_set(self, samples: List[np.ndarray]) -> np.ndarray:
@@ -91,7 +104,7 @@ class RombusModel(metaclass=_RombusModelABCMeta):
 
         return my_ts
 
-    def parse_cli_params(self, args):
+    def parse_cli_params(self, args: Tuple[str, Any]) -> Dict[str, Any]:
         """Parse parameters from arguments given on command line"""
 
         model_params = dict()
@@ -112,7 +125,7 @@ class RombusModel(metaclass=_RombusModelABCMeta):
 
         return model_params
 
-    def timing(self, samples):
+    def timing(self, samples: Samples) -> float:
         start_time = timeit.default_timer()
         for i, sample in enumerate(samples.samples):
             params_numpy = self.params.np2param(sample)
@@ -120,36 +133,30 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         return timeit.default_timer() - start_time
 
     @classmethod
-    def load(cls, model: str):
+    def load(cls, model: str) -> Self:
         """Import the model code"""
 
         model_class = _import_from_string(model)
         return model_class(model)
 
-    def write(self, h5file):
+    def write(self, h5file: hdf5.file) -> None:
         """Save samples to file"""
 
         h5_group = h5file.create_group("model")
         h5_group.create_dataset("model_str", data=self.model_str)
 
     @classmethod
-    def from_file(cls, file_in):
+    def from_file(cls, file_in: hdf5.file_or_filename):
         """Create a ROM instance from a file"""
 
-        close_file = False
-        if not isinstance(file_in, str):
-            h5file = file_in
-        else:
-            h5file = h5py.File(file_in, "r")
-            close_file = True
-
+        h5file = hdf5.ensure_open(file_in)
         model_str = h5file["model/model_str"].asstr()[()]
-        if close_file:
+        if type(file_in) == hdf5.filename:
             h5file.close()
         return cls.load(model_str)
 
     @classmethod
-    def write_project_template(cls, project_name):
+    def write_project_template(cls, project_name: str) -> None:
         """Write a project model and sample file to start a new project from."""
 
         # Set the model we will template from
@@ -176,7 +183,7 @@ class RombusModel(metaclass=_RombusModelABCMeta):
 #
 # Copyright © 2017-present, [Encode OSS Ltd](https://www.encode.io/).
 # All rights reserved.
-def _import_from_string(import_str: Any) -> Any:
+def _import_from_string(import_str: str) -> Any:
     if not isinstance(import_str, str):
         return import_str
 

@@ -70,6 +70,8 @@ language = {{ language | repr }}
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = [ 'content', {{ exclude_patterns }}]
 
+# Sort documented members by the order in which they occur in code
+autodoc_member_order = 'bysource'
 
 # -- Options for HTML output -------------------------------------------------
 
