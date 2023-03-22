@@ -3,4 +3,5 @@ make.bat
 conf.py
 _build
 *.rst
+*.md
 !overview.rst
