@@ -1,28 +1,35 @@
-import h5py
 import numpy as np
+
+from typing import Self
 
 import rombus._core.algorithms as algorithms
 import rombus._core.mpi as mpi
+import rombus._core.hdf5 as hdf5
+
+from rombus.reduced_basis import ReducedBasis
 
 DEFAULT_TOLERANCE = 1e-14
 DEFAULT_REFINE_N_RANDOM = 100
 
 
 class EmpiricalInterpolant(object):
-    def __init__(self, B_matrix=None, nodes=None):
+    def __init__(
+        self, B_matrix: np.ndarray = np.ndarray([]), nodes: np.ndarray = np.ndarray([])
+    ):
         """Initialise empirical interpolant"""
 
         self.B_matrix = B_matrix
         self.nodes = nodes
 
-    def compute(self, reduced_basis):
+    def compute(self, reduced_basis: ReducedBasis) -> Self:
         """Compute empirical interpolant"""
 
         # RB = RB[0 : len(RB)]
         if mpi.RANK_IS_MAIN:
             print("Computing empirical interpolant")
+        print(reduced_basis.matrix_shape)
         eim = algorithms.StandardEIM(
-            reduced_basis.matrix.shape[0], reduced_basis.matrix.shape[1]
+            reduced_basis.matrix_shape[0], reduced_basis.matrix_shape[1]
         )
         eim.make(reduced_basis.matrix)
         domain = reduced_basis.model.domain
@@ -31,7 +38,7 @@ class EmpiricalInterpolant(object):
 
         return self
 
-    def write(self, h5file):
+    def write(self, h5file: hdf5.File) -> None:
         """Save empirical interpolant to file"""
 
         h5_group = h5file.create_group("empirical_interpolant")
@@ -39,15 +46,10 @@ class EmpiricalInterpolant(object):
         h5_group.create_dataset("nodes", data=self.nodes)
 
     @classmethod
-    def from_file(cls, file_in):
+    def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
         """Create a ROM instance from a file"""
 
-        close_file = False
-        if not isinstance(file_in, str):
-            h5file = file_in
-        else:
-            h5file = h5py.File(file_in, "r")
-            close_file = True
+        h5file, close_file = hdf5.ensure_open(file_in)
         B_matrix = np.array(h5file["empirical_interpolant/B_matrix"])
         nodes = np.array(h5file["empirical_interpolant/nodes"])
         if close_file:

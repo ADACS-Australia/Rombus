@@ -1,29 +1,37 @@
 import timeit
 
-import h5py
+import h5py  # type: ignore
 import mpi4py
 import numpy as np
 
+from typing import Optional, Self
+
 import rombus._core.mpi as mpi
-from rombus.model import RombusModel
+import rombus._core.hdf5 as hdf5
+from rombus.model import RombusModel, RombusModelType
 from rombus.samples import Samples
 from rombus.ei import EmpiricalInterpolant
 from rombus.reduced_basis import ReducedBasis
 
-DEFAULT_TOLERANCE = 1e-14
-DEFAULT_REFINE_N_RANDOM = 100
+DEFAULT_TOLERANCE: float = 1e-14
+DEFAULT_REFINE_N_RANDOM: int = 100
+
+
+class ExceptionRomNotInitialised(Exception):
+    pass
 
 
 class ReducedOrderModel(object):
     def __init__(
         self,
-        model,
-        samples,
-        reduced_basis=None,
-        empirical_interpolant=None,
-        tol=DEFAULT_TOLERANCE,
+        model: RombusModelType,
+        samples: Samples,
+        reduced_basis: Optional[ReducedBasis] = None,
+        empirical_interpolant: Optional[EmpiricalInterpolant] = None,
+        tol: float = DEFAULT_TOLERANCE,
     ):
 
+        self.model: RombusModel
         if isinstance(model, str):
             self.model = RombusModel.load(model)
         elif isinstance(model, RombusModel):
@@ -31,7 +39,6 @@ class ReducedOrderModel(object):
         else:
             raise Exception
 
-        self.model = model
         self.samples = samples
         self.reduced_basis = reduced_basis
         self.empirical_interpolant = empirical_interpolant
@@ -81,20 +88,21 @@ class ReducedOrderModel(object):
                 self.empirical_interpolant.write(h5file)
 
     @classmethod
-    def from_file(cls, file_in):
+    def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
         """Create a ROM instance from a file"""
-        close_file = False
-        if not isinstance(file_in, str):
-            h5file = file_in
-        else:
-            h5file = h5py.File(file_in, "r")
-            close_file = True
-        model = RombusModel.from_file(h5file)
-        samples = Samples.from_file(h5file)
-        reduced_basis = ReducedBasis.from_file(h5file)
-        empirical_interpolant = EmpiricalInterpolant.from_file(h5file)
+
+        h5file, close_file = hdf5.ensure_open(file_in)
+
+        model: RombusModel = RombusModel.from_file(h5file)
+        samples: Samples = Samples.from_file(h5file)
+        reduced_basis: ReducedBasis = ReducedBasis.from_file(h5file)
+        empirical_interpolant: EmpiricalInterpolant = EmpiricalInterpolant.from_file(
+            h5file
+        )
+
         if close_file:
             h5file.close()
+
         return cls(
             model,
             samples,
@@ -102,17 +110,23 @@ class ReducedOrderModel(object):
             empirical_interpolant=empirical_interpolant,
         )
 
-    def timing(self, samples):
+    def timing(self, samples: Samples) -> float:
         start_time = timeit.default_timer()
         for i, sample in enumerate(samples.samples):
             params_numpy = self.model.params.np2param(sample)
             _ = self.evaluate(params_numpy)
         return timeit.default_timer() - start_time
 
-    def _validate_and_refine_basis(self, n_random, tol=DEFAULT_TOLERANCE, iterate=True):
+    def _validate_and_refine_basis(
+        self, n_random: int, tol: float = DEFAULT_TOLERANCE, iterate: bool = True
+    ) -> None:
+
+        if not self.reduced_basis:
+            self.reduced_basis = ReducedBasis().compute(
+                self.model, self.samples, tol=tol
+            )
 
         n_selected_greedy_points_global = np.iinfo(np.int32).max
-
         n_greedy_last = len(self.reduced_basis.greedypoints)
         n_greedy_last_global = mpi.COMM.allreduce(n_greedy_last, op=mpi4py.MPI.SUM)
         while True:

@@ -9,7 +9,7 @@ import rombus.plots as plots
 from rombus.model import RombusModel
 from rombus.samples import Samples
 from rombus.rom import ReducedOrderModel
-from typing import Any, Tuple
+from typing import Tuple
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 FLEX_CONTEXT_SETTINGS = dict(
@@ -20,10 +20,10 @@ FLEX_CONTEXT_SETTINGS = dict(
 
 
 class _OrderedGroup(click.Group):
-    """This class is used for to ensure that the ordering of the CLI subcommands
+    """This class is used to ensure that the ordering of the CLI subcommands
     are in code-order in the CLI help and documentation."""
 
-    def __init__(self, name: str = None, commands: str = None, **attrs: Any):
+    def __init__(self, name=None, commands=None, **attrs):
         super(_OrderedGroup, self).__init__(name, commands, **attrs)
         #: the registered subcommands by their exported names.
         self.commands = commands or collections.OrderedDict()
@@ -81,17 +81,17 @@ def build(
     """
 
     # Load model
-    model = RombusModel.load(model)
+    model_loaded = RombusModel.load(model)
 
     # Load samples
-    samples = Samples(model, filename=filename_samples)
+    samples = Samples(model_loaded, filename=filename_samples)
 
     # Build ROM
-    ROM = ReducedOrderModel(model, samples).build(do_step=do_step)
+    ROM = ReducedOrderModel(model_loaded, samples).build(do_step=do_step)
 
     # Write ROM
     if out == "MODEL_BASENAME.hdf5":
-        filename_out = f"{model.model_basename}.hdf5"
+        filename_out = f"{model_loaded.model_basename}.hdf5"
     else:
         filename_out = out
     ROM.write(filename_out)

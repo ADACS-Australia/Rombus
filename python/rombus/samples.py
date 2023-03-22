@@ -1,41 +1,44 @@
-from __future__ import annotations
-from typing import List
+from typing import Any, Dict, List, Optional, Self, TypeAlias
 
-import h5py
 import numpy as np
 
 import rombus._core.mpi as mpi
 
 from rombus.model import RombusModel
+from rombus._core import hdf5
 
 DEFAULT_TOLERANCE = 1e-14
 DEFAULT_REFINE_N_RANDOM = 100
 
+Sample: TypeAlias = np.ndarray
+
 
 class Samples(object):
-    def __init__(self, model, filename=None, n_random=0):
+    def __init__(
+        self, model: RombusModel, filename: Optional[str] = None, n_random: int = 0
+    ):
 
-        self.model = model
+        self.model: RombusModel = model
+        self.n_random: int = n_random
 
-        # Needed for random number generation
-        self.n_random = n_random
-        self.random = None
-        self.random_starting_state = None
+        # RNG current and initial state
+        self.random: Optional[np.random._generator.Generator] = None
+        self.random_starting_state: Optional[Dict[str, Any]] = None
 
         # Initialise samples
-        self.n_samples = 0
-        self.samples = []
+        self.n_samples: np.int32 = np.int32(0)
+        self.samples: List[Sample] = []
         if filename:
             self._add_from_file(filename)
         if self.n_random > 0:
             self._add_random_samples(self.n_random)
 
-    def extend(self, new_samples):
+    def extend(self, new_samples: List[Sample]) -> None:
 
         self.samples.extend(new_samples)
         self.n_samples = self.n_samples + len(new_samples)
 
-    def write(self, h5file):
+    def write(self, h5file: hdf5.File):
         """Save samples to file"""
 
         h5_group = h5file.create_group("samples")
@@ -44,16 +47,10 @@ class Samples(object):
         h5_group.create_dataset("n_samples", data=self.n_samples)
 
     @classmethod
-    def from_file(cls, file_in):
+    def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
         """Create a ROM instance from a file"""
 
-        close_file = False
-        if not isinstance(file_in, str):
-            h5file = file_in
-        else:
-            h5file = h5py.File(file_in, "r")
-            close_file = True
-
+        h5file, close_file = hdf5.ensure_open(file_in)
         model_str = h5file["samples/model/model_str"].asstr()[()]
         model = RombusModel.load(model_str)
         samples = cls(model)
@@ -63,7 +60,7 @@ class Samples(object):
             h5file.close()
         return samples
 
-    def _add_from_file(self, filename_in: str):
+    def _add_from_file(self, filename_in: str) -> None:
 
         # dividing greedypoints into chunks
         if mpi.RANK_IS_MAIN:
@@ -85,7 +82,7 @@ class Samples(object):
         self.samples.extend(new_samples)
         self.n_samples = self.n_samples + n_new_samples
 
-    def _add_random_samples(self, n_samples):
+    def _add_random_samples(self, n_samples: int) -> None:
 
         self.random = np.random.default_rng()
         self.random_starting_state = np.random.get_state()
@@ -105,9 +102,9 @@ class Samples(object):
 
     def _decompose_samples(
         self,
-        samples: List[np.ndarray],
+        samples: List[Sample],
     ):
-        chunks = None
+        chunks: List[List[Sample]] = [[]]
         if mpi.RANK_IS_MAIN:
             chunks = [[] for _ in range(mpi.SIZE)]
             for i, chunk in enumerate(samples):

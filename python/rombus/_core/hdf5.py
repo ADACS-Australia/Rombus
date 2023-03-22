@@ -1,15 +1,15 @@
-import h5py
+import h5py  # type: ignore
 
-from typing import Union
+from typing import TypeVar, TypeAlias
 
 # The following are used for type hints
-file = h5py._hl.files.File
-filename = str
-file_or_filename = Union[file, str]
+File: TypeAlias = h5py.File
+Filename: TypeAlias = str
+FileOrFilename = TypeVar("FileOrFilename", Filename, File)
 
 
-def ensure_open(file_in: file_or_filename) -> file:
-    if isinstance(file_in, filename):
-        return h5py.File(file_in, "r")
+def ensure_open(file_in: FileOrFilename) -> File:
+    if type(file_in) == Filename:
+        return h5py.File(file_in, "r"), True
     else:
-        return file_in
+        return file_in, False

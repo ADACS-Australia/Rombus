@@ -31,7 +31,7 @@ class model(RombusModel):
     # IDEs and linters have troubles following.
     #
     # Syntax: params.add(name, min_value_allowed,max_value_allowed)
-    params.add("A", 0, 10)  # noqa F821
+    params.add("A", 0, 10)  # type: ignore # noqa F821
 
     # Anything added as a class member here will just be computed once and will
     # be accessible in the 'compute()' and 'set-domain()' methods below.
@@ -41,16 +41,16 @@ class model(RombusModel):
         self.n_x = 1024
 
     # Set the domain over-and-on which the ROM will be defined
-    def set_domain(self) -> np.array:
+    def set_domain(self) -> np.ndarray:
         return np.linspace(self.x_min, self.x_max, self.n_x)
 
     # Compute the model.  This function should accept a named tuple with
     # member names given by the params.add() calls above and iter should
     # return a numpy array of type given my 'model_dtype' given above
-    def compute(self, params: NamedTuple, x) -> np.array:
+    def compute(self, params: NamedTuple, x) -> np.ndarray:
         """Compute the model for a given parameter set."""
 
-        return sinc_vectorized(params.A * x)
+        return sinc_vectorized(params.A * x)  # type: ignore
 
 
 # Create the function that will compute our model
@@ -65,5 +65,6 @@ def sinc_scalar(x):
 
 
 # Use np.vectorize() to create a function that accepts a
-# numpy array and returns a numpy array
+# numpy array and returns a numpy array.  This will be them
+# function that Rombus actually calls to compute the model
 sinc_vectorized = np.vectorize(sinc_scalar)

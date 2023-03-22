@@ -1,8 +1,13 @@
 import numpy as np
-import pylab as plt
+
+from typing import Any, Dict, List
+
+import pylab as plt  # type: ignore
+
+from rombus.rom import ReducedOrderModel, ExceptionRomNotInitialised
 
 
-def errors(err_list):
+def errors(err_list: List[float]) -> None:
     plt.plot(err_list)
     plt.xlabel("# Basis elements")
     plt.ylabel("Error")
@@ -11,7 +16,7 @@ def errors(err_list):
     plt.savefig("basis_error.png")
 
 
-def basis(rb_matrix):
+def basis(rb_matrix: List[np.ndarray]) -> None:
     num_elements = len(rb_matrix)
     total_frames = 125
     n_models_per_frame = int(num_elements / total_frames)
@@ -30,21 +35,34 @@ def basis(rb_matrix):
     fig.savefig("basis.png")
 
 
-def compare_rom_to_true(ROM, model_params_in):
+def compare_rom_to_true(
+    ROM: ReducedOrderModel, model_params_in: Dict[str, Any]
+) -> None:
     """Compare computed ROM to input model"""
 
-    model_params = ROM.model.params.params_dtype(**model_params_in)
+    if ROM.model is None or ROM.empirical_interpolant is None:
+        raise ExceptionRomNotInitialised
+    else:
 
-    domain = ROM.model.domain
+        # N.B.: mypy struggles with NamedTuples, so typing is turned off for the following
+        model_params = ROM.model.params.params_dtype(**model_params_in)  # type: ignore
 
-    model_full = ROM.model.compute(model_params, domain)
-    model_nodes = ROM.model.compute(model_params, ROM.empirical_interpolant.nodes)
-    model_rom = ROM.evaluate(model_params)
+        domain = ROM.model.domain
 
-    plt.semilogx(domain, model_rom, label="ROM", alpha=0.5, linestyle="--")
-    plt.semilogx(domain, model_full, label="Full model", alpha=0.5)
-    plt.scatter(ROM.empirical_interpolant.nodes, model_nodes, s=1)
-    plt.legend()
+        model_full = ROM.model.compute(model_params, domain)
 
-    np.save("ROM_diff", np.subtract(model_rom, model_full))
-    plt.savefig("comparison.pdf", bbox_inches="tight")
+        if ROM.empirical_interpolant.nodes is None:
+            raise ExceptionRomNotInitialised
+        else:
+            model_nodes = ROM.model.compute(
+                model_params, ROM.empirical_interpolant.nodes
+            )
+            model_rom = ROM.evaluate(model_params)
+
+            plt.semilogx(domain, model_rom, label="ROM", alpha=0.5, linestyle="--")
+            plt.semilogx(domain, model_full, label="Full model", alpha=0.5)
+            plt.scatter(ROM.empirical_interpolant.nodes, model_nodes, s=1)
+            plt.legend()
+
+            np.save("ROM_diff", np.subtract(model_rom, model_full))
+            plt.savefig("comparison.pdf", bbox_inches="tight")
