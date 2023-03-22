@@ -1,17 +1,17 @@
-{{ [project, "Documentation"] | join(" ")  }}
+.. include :: ../README.md
+   :parser: myst_parser.sphinx_
+
 {% for c in [project, "Documentation"] | join(" ") %}#{% endfor %}
 
 .. toctree::
    :caption: Table of Contents
    :maxdepth: 3
 
-   Overview <overview>
-   notes_for_developers
-   {{ project }}
-
-.. click:: rombus.cli:cli
-   :prog: rombus
-   :show-nested:
+   Home <self>
+   Getting Started <getting_started>
+   CLI Documentation <cli>
+   API Documentation <{{ project }}>
+   Notes for Developers <notes_for_developers>
 
 Index
 =====

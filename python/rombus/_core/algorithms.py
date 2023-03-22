@@ -207,7 +207,7 @@ class StandardRB(greedy.ReducedBasis, greedy.IteratedModifiedGramSchmidt):
         self.ctr = 1
 
         # Allocate memory for numpy arrays
-        self.malloc(Nbasis, Npoints, Nquads, Nmodes=Nmodes, dtype=dtype)
+        self.malloc_rb(Nbasis, Npoints, Nquads, Nmodes=Nmodes, dtype=dtype)
         pass
 
     def seed(self, index_seed, trsp):
@@ -348,7 +348,7 @@ class StandardEIM(eim.EmpiricalInterpolation):
         eim.EmpiricalInterpolation.__init__(self)
 
         # Allocate memory for numpy arrays
-        self.malloc(Nbasis, Nquads, Nmodes=Nmodes, dtype=dtype)
+        self.malloc_ei(Nbasis, Nquads, Nmodes=Nmodes, dtype=dtype)
         self.modes = Nmodes
         self.quads = Nquads
 
@@ -387,7 +387,7 @@ class StandardEIM(eim.EmpiricalInterpolation):
             print("\nIter", "\t", "Indices")
         if timerQ:
             t0 = time.time()
-        dim = len(basis[:, 0])
+        dim = len(basis)
         for ctr in range(dim - 1):
             if verbose:
                 print(ctr + 1, "\t", self.indices[ctr])

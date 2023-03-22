@@ -6,10 +6,10 @@
 
 
 import numpy as np
-from scipy.interpolate import splev, splrep
+from scipy.interpolate import splev, splrep  # type: ignore
 
 # from scipy.optimize import curve_fit
-from scipy.optimize import leastsq
+from scipy.optimize import leastsq  # type: ignore
 
 from . import lib
 

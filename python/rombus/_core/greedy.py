@@ -107,7 +107,7 @@ class ReducedBasis:
         self.inner = inner
         self.inner_type = inner_type
 
-    def malloc(self, Nbasis, Npoints, Nquads, Nmodes=1, dtype="complex"):
+    def malloc_rb(self, Nbasis, Npoints, Nquads, Nmodes=1, dtype="complex"):
         """Allocate memory for numpy arrays used for making reduced basis"""
         self.errors = lib.malloc("double", Nbasis)
         self.indices = lib.malloc("int", Nbasis)

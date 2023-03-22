@@ -5,7 +5,7 @@
 __author__ = "Chad Galley <crgalley@gmail.com>"
 
 import numpy as np
-from scipy.special import factorial
+from scipy.special import factorial  # type: ignore
 
 
 def malloc(dtype, *nums):

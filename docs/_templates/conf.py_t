@@ -68,8 +68,10 @@ language = {{ language | repr }}
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = [{{ exclude_patterns }}]
+exclude_patterns = [ 'content', {{ exclude_patterns }}]
 
+# Sort documented members by the order in which they occur in code
+autodoc_member_order = 'bysource'
 
 # -- Options for HTML output -------------------------------------------------
 

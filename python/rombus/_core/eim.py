@@ -8,7 +8,7 @@ __author__ = "Chad Galley <crgalley@gmail.com>"
 import numpy as np
 
 # from __init__ import np
-from scipy.linalg.lapack import get_lapack_funcs
+from scipy.linalg.lapack import get_lapack_funcs  # type: ignore
 
 # from scipy.linalg import solve_triangular
 from . import lib
@@ -133,7 +133,7 @@ class EmpiricalInterpolation(LinAlg):
     def __init__(self):
         LinAlg.__init__(self)
 
-    def malloc(self, Nbasis, Nquads, Nmodes=1, dtype="complex"):
+    def malloc_ei(self, Nbasis, Nquads, Nmodes=1, dtype="complex"):
         self.indices = lib.malloc("int", Nbasis)
         self.invV = lib.malloc(dtype, Nbasis, Nbasis)
         self.R = lib.malloc(dtype, Nbasis, Nquads)
