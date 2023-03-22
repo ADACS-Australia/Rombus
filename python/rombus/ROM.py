@@ -1,5 +1,6 @@
 import timeit
 
+
 import h5py  # type: ignore
 import mpi4py
 import numpy as np
