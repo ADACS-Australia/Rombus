@@ -31,15 +31,20 @@ class ReducedBasis(object):
         except exceptions.RombusException as e:
             e.handle_exception()
 
-    def _set_matrix_shape(self) -> None:
-        mtx_len = len(self.matrix)
-        self.matrix_shape = [mtx_len]
-        if mtx_len > 0:
-            mtx_dim = self.matrix[-1].shape
-            for dim in mtx_dim:
-                self.matrix_shape.append(dim)
-        else:
-            self.matrix_shape.append(0)
+    @classmethod
+    def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
+        """Create a ROM instance from a file"""
+
+        try:
+            h5file, close_file = hdf5.ensure_open(file_in)
+            matrix = [np.array(x) for x in h5file["reduced_basis/matrix"]]
+            greedypoints = [np.array(x) for x in h5file["reduced_basis/greedypoints"]]
+            error_list = [x for x in h5file["reduced_basis/error_list"]]
+            if close_file:
+                h5file.close()
+        except IOError as e:
+            exceptions.handle_exception(e)
+        return cls(matrix=matrix, greedypoints=greedypoints, error_list=error_list)
 
     def compute(
         self, model: RombusModelType, samples: Samples, tol: float = DEFAULT_TOLERANCE
@@ -53,61 +58,61 @@ class ReducedBasis(object):
         if mpi.RANK_IS_MAIN:
             print("Filling basis with greedy-algorithm")
 
-        # hardcoding 1st model to be used to start the basis
-        self._init_matrix(my_ts[0])
-        basis_indicies = [0]
+        try:
+            # hardcoding 1st model to be used to start the basis
+            self._init_matrix(my_ts[0])
+            basis_indicies = [0]
 
-        # NOTE: NEED TO FIX; THE FIRST INDEX IS BEING ADDED TWICE HERE!
-        error = np.inf
-        iter = 1
-        pc_matrix: List[np.ndarray] = []
-        while error > tol:
-            self.matrix, pc_matrix, error_data = self._add_next_model_to_basis(
-                pc_matrix, my_ts, iter
-            )
-            self.matrix_shape[0] = len(self.matrix)
-            err_rnk, err_idx, error = error_data
+            # NOTE: NEED TO FIX; THE FIRST INDEX IS BEING ADDED TWICE HERE!
+            error = np.inf
+            iter = 1
+            pc_matrix: List[np.ndarray] = []
+            while error > tol:
+                self.matrix, pc_matrix, error_data = self._add_next_model_to_basis(
+                    pc_matrix, my_ts, iter
+                )
+                self.matrix_shape[0] = len(self.matrix)
+                err_rnk, err_idx, error = error_data
 
-            # log and cache some data
-            m = f">>> Iter {iter:003}: err {error:.1E} (rank {err_rnk:002}@idx{err_idx:003})"
-            sys.stdout.write("\033[K" + m + "\r")
+                # log and cache some data
+                m = f">>> Iter {iter:003}: err {error:.1E} (rank {err_rnk:002}@idx{err_idx:003})"
+                sys.stdout.write("\033[K" + m + "\r")
 
-            basis_index = self._convert_to_basis_index(
-                err_rnk, err_idx, samples.n_samples
-            )
-            self.error_list.append(error)
-            basis_indicies.append(basis_index)
+                basis_index = self._convert_to_basis_index(
+                    err_rnk, err_idx, samples.n_samples
+                )
+                self.error_list.append(error)
+                basis_indicies.append(basis_index)
 
-            # update iteration count
-            iter += 1
-        print("\n")
+                # update iteration count
+                iter += 1
+            print("\n")
 
-        self.greedypoints = [samples.samples[i] for i in basis_indicies]
-
+            self.greedypoints = [samples.samples[i] for i in basis_indicies]
+        except exceptions.RombusException as e:
+            e.handle_exception()
         return self
 
     def write(self, h5file: hdf5.File) -> None:
         """Save samples to file"""
 
-        h5_group = h5file.create_group("reduced_basis")
-        h5_group.create_dataset("matrix", data=self.matrix)
-        h5_group.create_dataset("greedypoints", data=self.greedypoints)
-        h5_group.create_dataset("error_list", data=self.error_list)
+        try:
+            h5_group = h5file.create_group("reduced_basis")
+            h5_group.create_dataset("matrix", data=self.matrix)
+            h5_group.create_dataset("greedypoints", data=self.greedypoints)
+            h5_group.create_dataset("error_list", data=self.error_list)
+        except IOError as e:
+            exceptions.handle_exception(e)
 
-    @classmethod
-    def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
-        """Create a ROM instance from a file"""
-
-        h5file, close_file = hdf5.ensure_open(file_in)
-
-        matrix = [np.array(x) for x in h5file["reduced_basis/matrix"]]
-        greedypoints = [np.array(x) for x in h5file["reduced_basis/greedypoints"]]
-        error_list = [x for x in h5file["reduced_basis/error_list"]]
-
-        if close_file:
-            h5file.close()
-
-        return cls(matrix=matrix, greedypoints=greedypoints, error_list=error_list)
+    def _set_matrix_shape(self) -> None:
+        mtx_len = len(self.matrix)
+        self.matrix_shape = [mtx_len]
+        if mtx_len > 0:
+            mtx_dim = self.matrix[-1].shape
+            for dim in mtx_dim:
+                self.matrix_shape.append(dim)
+        else:
+            self.matrix_shape.append(0)
 
     def _add_next_model_to_basis(
         self, pc_matrix: List[np.ndarray], my_ts: np.ndarray, iter: int

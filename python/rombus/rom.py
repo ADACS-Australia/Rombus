@@ -9,6 +9,7 @@ from typing import Optional, Self
 
 import rombus._core.mpi as mpi
 import rombus._core.hdf5 as hdf5
+import rombus.exceptions as exceptions
 from rombus.model import RombusModel, RombusModelType
 from rombus.samples import Samples
 from rombus.ei import EmpiricalInterpolant
@@ -16,10 +17,6 @@ from rombus.reduced_basis import ReducedBasis
 
 DEFAULT_TOLERANCE: float = 1e-14
 DEFAULT_REFINE_N_RANDOM: int = 100
-
-
-class ExceptionRomNotInitialised(Exception):
-    pass
 
 
 class ReducedOrderModel(object):
@@ -32,13 +29,7 @@ class ReducedOrderModel(object):
         tol: float = DEFAULT_TOLERANCE,
     ):
 
-        self.model: RombusModel
-        if isinstance(model, str):
-            self.model = RombusModel.load(model)
-        elif isinstance(model, RombusModel):
-            self.model = model
-        else:
-            raise Exception
+        self.model: RombusModel = RombusModel.load(model)
 
         self.samples = samples
         self.reduced_basis = reduced_basis
@@ -47,9 +38,12 @@ class ReducedOrderModel(object):
     def build(self, do_step=None, tol=DEFAULT_TOLERANCE):
 
         if do_step is None or do_step == "RB":
-            self.reduced_basis = ReducedBasis().compute(
-                self.model, self.samples, tol=tol
-            )
+            try:
+                self.reduced_basis = ReducedBasis().compute(
+                    self.model, self.samples, tol=tol
+                )
+            except exceptions.RombusException as e:
+                e.handle_exception()
 
         if do_step is None or do_step == "EI":
             if self.reduced_basis is None:
@@ -90,7 +84,9 @@ class ReducedOrderModel(object):
 
     @classmethod
     def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
-        """Create a ROM instance from a file"""
+        """Create a ROM instance from a file.
+
+        If given an open HDF5 file, then use it.  If given a valid filename then open it for reading but close it when done."""
 
         h5file, close_file = hdf5.ensure_open(file_in)
 

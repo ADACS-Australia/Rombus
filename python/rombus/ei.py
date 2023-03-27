@@ -5,6 +5,7 @@ from typing import Self
 import rombus._core.algorithms as algorithms
 import rombus._core.mpi as mpi
 import rombus._core.hdf5 as hdf5
+import rombus.exceptions as exceptions
 
 from rombus.reduced_basis import ReducedBasis
 
@@ -45,11 +46,15 @@ class EmpiricalInterpolant(object):
 
         if mpi.RANK_IS_MAIN:
             print("Computing empirical interpolant")
-        print(reduced_basis.matrix_shape)
+
+        ######################################################
+        # TODO: move the code for these calls into this class
         eim = algorithms.StandardEIM(
             reduced_basis.matrix_shape[0], reduced_basis.matrix_shape[1]
         )
         eim.make(reduced_basis.matrix)
+        ######################################################
+
         domain = reduced_basis.model.domain
         self.nodes = domain[eim.indices]
         self.nodes, self.B_matrix = zip(*sorted(zip(self.nodes, eim.B)))
@@ -65,17 +70,23 @@ class EmpiricalInterpolant(object):
             Open HDF5 file
         """
 
-        h5_group = h5file.create_group("empirical_interpolant")
-        h5_group.create_dataset("B_matrix", data=self.B_matrix)
-        h5_group.create_dataset("nodes", data=self.nodes)
+        try:
+            h5_group = h5file.create_group("empirical_interpolant")
+            h5_group.create_dataset("B_matrix", data=self.B_matrix)
+            h5_group.create_dataset("nodes", data=self.nodes)
+        except IOError as e:
+            exceptions.handle_exception(e)
 
     @classmethod
     def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
         """Create a ROM instance from a file"""
 
-        h5file, close_file = hdf5.ensure_open(file_in)
-        B_matrix = np.array(h5file["empirical_interpolant/B_matrix"])
-        nodes = np.array(h5file["empirical_interpolant/nodes"])
-        if close_file:
-            h5file.close()
+        try:
+            h5file, close_file = hdf5.ensure_open(file_in)
+            B_matrix = np.array(h5file["empirical_interpolant/B_matrix"])
+            nodes = np.array(h5file["empirical_interpolant/nodes"])
+            if close_file:
+                h5file.close()
+        except IOError as e:
+            exceptions.handle_exception(e)
         return cls(B_matrix=B_matrix, nodes=nodes)

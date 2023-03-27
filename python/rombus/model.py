@@ -12,10 +12,12 @@ import numpy as np
 
 import rombus._core.mpi as mpi
 import rombus._core.hdf5 as hdf5
+import rombus.exceptions as exceptions
 from rombus.params import Params
 from typing import NamedTuple
 
-# Need to put Samples in quotes below and check TYPE_CHECKING here to manage circular import with models.py
+# Need to put Samples in quotes below and check TYPE_CHECKING here to
+# manage circular imports with models.py
 if TYPE_CHECKING:
     from rombus.samples import Samples
 
@@ -49,11 +51,14 @@ class _RombusModelABCMeta(_RombusModelMeta, ABCMeta):
 
 
 class RombusModel(metaclass=_RombusModelABCMeta):
-    """Baseclass from which all user-defined models should inherit.
+    """Baseclass from which all RombusModels must inherit.
 
-    Attributes:
-        params      Model parameters
-        model_dtype Datatype returned by model's compute method
+    Attributes
+    ----------
+    model_str : String from which the model was originally instantiated
+    model_basename : The submodule where the model was found.  Used as file basename.
+    domain : The domain used for the model
+    n_domain : Number of elements in the domain
     """
 
     # These two members are instantiated by the metaclass
@@ -64,11 +69,9 @@ class RombusModel(metaclass=_RombusModelABCMeta):
 
     def __init__(self, model: str):
 
-        # Check that at least one parameter has beed defined
-        assert self.params.count > 0
-
-        # Ensure that model_dtype is of the right type
-        # assert self.model_dtype.type == np.dtype
+        # Keep track of the model string so we can reinstantiate from a saved state
+        self.model_str: str = model
+        self.model_basename: str = self.model_str.split(":")[0].split(".")[-1]
 
         # Run an optional cache() method
         self.cache()
@@ -80,9 +83,14 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         # Check that the domain has been suitably set
         assert self.n_domain > 0
 
-        # Keep track of the model string so we can reinstantiate from a saved state
-        self.model_str: str = model
-        self.model_basename: str = self.model_str.split(":")[0].split(".")[-1]
+        # Check that at least one parameter has beed defined
+        if self.params.count <= 0:
+            raise exceptions.RombusModelParamsError(
+                f"Invalid number of parameters ({self.params.count}) specified for Rombus model ({self})."
+            )
+
+    def __str__(self):
+        return f"<RombusModel from {self.model_str}>"
 
     @abstractmethod  # make sure this is the inner-most decorator
     def set_domain(self) -> np.ndarray:
@@ -164,25 +172,41 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         return timeit.default_timer() - start_time
 
     @classmethod
-    def load(cls, model: str) -> Self:
+    def load(cls, model: str | Self) -> Self:
 
-        model_class = _import_from_string(model)
-        return model_class(model)
+        if isinstance(model, str):
+            try:
+                model_class = _import_from_string(model)
+            except exceptions.RombusException as e:
+                exceptions.handle_exception(e)
+            else:
+                return model_class(model)
+        elif not isinstance(model, RombusModel):
+            raise exceptions.RombusModelInitError(
+                "Invalid type ({type(model)}) specified when loading model {model}."
+            )
+        return model  # type: ignore
 
     def write(self, h5file: hdf5.File) -> None:
         """Save samples to file"""
 
-        h5_group = h5file.create_group("model")
-        h5_group.create_dataset("model_str", data=self.model_str)
+        try:
+            h5_group = h5file.create_group("model")
+            h5_group.create_dataset("model_str", data=self.model_str)
+        except IOError as e:
+            exceptions.handle_exception(e)
 
     @classmethod
     def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
         """Create a ROM instance from a file"""
 
-        h5file, close_file = hdf5.ensure_open(file_in)
-        model_str = h5file["model/model_str"].asstr()[()]
-        if close_file:
-            h5file.close()
+        try:
+            h5file, close_file = hdf5.ensure_open(file_in)
+            model_str = h5file["model/model_str"].asstr()[()]
+            if close_file:
+                h5file.close()
+        except IOError as e:
+            exceptions.handle_exception(e)
         return cls.load(model_str)
 
     @classmethod
@@ -204,48 +228,55 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         samples_file_out = os.path.join(os.getcwd(), f"{project_name}_samples.csv")
 
         # Copy files
-        shutil.copy(model_file_source, model_file_out)
-        shutil.copy(samples_file_source, samples_file_out)
+        try:
+            shutil.copy(model_file_source, model_file_out)
+            shutil.copy(samples_file_source, samples_file_out)
+        except IOError as e:
+            exceptions.handle_exception(e)
 
 
 RombusModelType = RombusModel | str
 
-# The code that follows has been copied directly from the Uvicorn codebase: https://github.com/encode/uvicorn
-# (commit: d613cbea388bafafb6f642077c035ed137deea61)
-#
+# The code that follows is modified from code copied from the Uvicorn codebase:
+#     https://github.com/encode/uvicorn (commit: d613cbea388bafafb6f642077c035ed137deea61)
 # Copyright © 2017-present, [Encode OSS Ltd](https://www.encode.io/).
 # All rights reserved.
 def _import_from_string(import_str: str) -> Any:
-    if not isinstance(import_str, str):
-        return import_str
 
+    if not isinstance(import_str, str):
+        raise exceptions.RombusModelImportFromStringError(
+            f'Import string must be a string with format "<module>:<attribute>".  It is actually of type {type(import_str)}.'
+        )
+
+    # Make sure the CWD is in the import path
+    sys.path.append(os.getcwd())
+    sys.path = list(dict.fromkeys(sys.path))
+
+    # Split the string
     module_str, _, attrs_str = import_str.partition(":")
     if not module_str or not attrs_str:
-        message = (
-            'Import string "{import_str}" must be in format "<module>:<attribute>".'
+        raise exceptions.RombusModelImportFromStringError(
+            f'Import string "{import_str}" must be in format "<module>:<attribute>".'
         )
-        raise ImportFromStringError(message.format(import_str=import_str))
 
+    # Try to import the module
     try:
         module = importlib.import_module(module_str)
     except ImportError as exc:
         if exc.name != module_str:
             raise exc from None
-        message = 'Could not import module "{module_str}".'
-        raise ImportFromStringError(message.format(module_str=module_str))
-
+        raise exceptions.RombusModelImportFromStringError(
+            f'Could not import module "{module_str}".\n'
+        )
     instance = module
+
+    # Try to grab the specified class
     try:
         for attr_str in attrs_str.split("."):
             instance = getattr(instance, attr_str)
     except AttributeError:
-        message = 'Attribute "{attrs_str}" not found in module "{module_str}".'
-        raise ImportFromStringError(
-            message.format(attrs_str=attrs_str, module_str=module_str)
+        raise exceptions.RombusModelImportFromStringError(
+            f'Attribute "{attrs_str}" not found in module "{module_str}".'
         )
 
     return instance
-
-
-class ImportFromStringError(Exception):
-    pass
