@@ -13,6 +13,14 @@ DEFAULT_REFINE_N_RANDOM = 100
 
 
 class EmpiricalInterpolant(object):
+    """Class for managing the creation of empirical interpolants (EIs)
+
+    Attributes
+    ----------
+    B_matrix : Basis matrix
+    nodes : Interpolant nodes
+    """
+
     def __init__(
         self, B_matrix: np.ndarray = np.ndarray([]), nodes: np.ndarray = np.ndarray([])
     ):
@@ -22,9 +30,19 @@ class EmpiricalInterpolant(object):
         self.nodes = nodes
 
     def compute(self, reduced_basis: ReducedBasis) -> Self:
-        """Compute empirical interpolant"""
+        """Compute empirical interpolant for a given reduced basis
 
-        # RB = RB[0 : len(RB)]
+        Parameters
+        ----------
+        reduced_basis : ReducedBasis
+            Reduced basis used to compute the empirical interpolant
+
+        Returns
+        -------
+        Self
+            A reference to self, to allow for chaining of method calls
+        """
+
         if mpi.RANK_IS_MAIN:
             print("Computing empirical interpolant")
         print(reduced_basis.matrix_shape)
@@ -39,7 +57,13 @@ class EmpiricalInterpolant(object):
         return self
 
     def write(self, h5file: hdf5.File) -> None:
-        """Save empirical interpolant to file"""
+        """Write empirical interpolant to an open HDF5 file
+
+        Parameters
+        ----------
+        h5file : hdf5.File
+            Open HDF5 file
+        """
 
         h5_group = h5file.create_group("empirical_interpolant")
         h5_group.create_dataset("B_matrix", data=self.B_matrix)

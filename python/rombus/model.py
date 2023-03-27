@@ -153,6 +153,9 @@ class RombusModel(metaclass=_RombusModelABCMeta):
 
         return model_params
 
+    def sample(self, kwargs: Dict[str, Any]) -> NamedTuple:
+        return self.params.params_dtype(**kwargs)  # type: ignore
+
     def timing(self, samples: "Samples") -> float:
         start_time = timeit.default_timer()
         for i, sample in enumerate(samples.samples):

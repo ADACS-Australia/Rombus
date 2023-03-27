@@ -45,7 +45,8 @@ def compare_rom_to_true(
     else:
 
         # N.B.: mypy struggles with NamedTuples, so typing is turned off for the following
-        model_params = ROM.model.params.params_dtype(**model_params_in)  # type: ignore
+        model_params = ROM.model.sample(model_params_in)
+        # model_params = ROM.model.params.params_dtype(**model_params_in)  # type: ignore
 
         domain = ROM.model.domain
 

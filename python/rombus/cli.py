@@ -81,7 +81,11 @@ def build(
     """
 
     # Load model
-    model_loaded = RombusModel.load(model)
+    try:
+        model_loaded = RombusModel.load(model)
+    except Exception as e:
+        print(f"Error encountered: {e}")
+        exit(1)
 
     # Load samples
     samples = Samples(model_loaded, filename=filename_samples)
