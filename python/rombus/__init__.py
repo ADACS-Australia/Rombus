@@ -1,5 +1,3 @@
-# --- __init__.py ---
-
 """
 
    How to use the documentation

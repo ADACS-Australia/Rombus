@@ -4,15 +4,29 @@ import numpy as np
 
 from typing import List, Self, Tuple
 
-import rombus._core.misc as misc
 import rombus._core.mpi as mpi
 import rombus._core.hdf5 as hdf5
+import rombus.exceptions as exceptions
 from rombus.samples import Samples
 from rombus.model import RombusModel, RombusModelType
 
 DEFAULT_TOLERANCE = 1e-14
 DEFAULT_REFINE_N_RANDOM = 100
 
+def _get_highest_error(error_list):
+    rank, idx, err = -np.inf, -np.inf, -np.inf
+    for rank_id, rank_errors in enumerate(error_list):
+        max_rank_err = max(rank_errors)
+        if max_rank_err > err:
+            err = max_rank_err
+            idx = rank_errors.index(err)
+            rank = rank_id
+    return rank, idx, np.float64(err.real)
+
+def _dot_product(weights, a, b):
+
+    assert len(a) == len(b)
+    return np.vdot(a * weights, b)
 
 class ReducedBasis(object):
     def __init__(
@@ -22,11 +36,13 @@ class ReducedBasis(object):
         error_list: List[float] = [],
         matrix_shape: List[int] = [0, 0],
     ):
-
-        self.matrix = matrix
-        self.greedypoints = greedypoints
-        self.error_list = error_list
-        self._set_matrix_shape()
+        try:
+            self.matrix = matrix
+            self.greedypoints = greedypoints
+            self.error_list = error_list
+            self._set_matrix_shape()
+        except exceptions.RombusException as e:
+            e.handle_exception()
 
     def _set_matrix_shape(self) -> None:
         mtx_len = len(self.matrix)
@@ -42,13 +58,7 @@ class ReducedBasis(object):
         self, model: RombusModelType, samples: Samples, tol: float = DEFAULT_TOLERANCE
     ) -> Self:
 
-        self.model: RombusModel
-        if isinstance(model, str):
-            self.model = RombusModel.load(model)
-        elif isinstance(model, RombusModel):
-            self.model = model
-        else:
-            raise Exception
+        self.model: RombusModel = RombusModel.load(model)
 
         # Compute the model for each given sample
         my_ts: np.ndarray = self.model.generate_model_set(samples)
@@ -116,9 +126,7 @@ class ReducedBasis(object):
         self, pc_matrix: List[np.ndarray], my_ts: np.ndarray, iter: int
     ) -> Tuple[List[np.ndarray], List[np.ndarray], Tuple[int, int, int]]:
         # project training set on basis + get errors
-        pc = misc.project_onto_basis(
-            1.0, self.matrix, my_ts, iter - 1, self.model.model_dtype
-        )
+        pc = self._project_onto_basis( 1.0, my_ts, iter - 1)
         pc_matrix.append(pc)
 
         projection_errors = list(
@@ -133,7 +141,7 @@ class ReducedBasis(object):
 
         # determine highest error
         if mpi.RANK_IS_MAIN:
-            error_data = misc.get_highest_error(all_rank_errors)
+            error_data = _get_highest_error(all_rank_errors)
             err_rank, err_idx, error = error_data
         else:
             error_data = None, None, None
@@ -155,11 +163,45 @@ class ReducedBasis(object):
         # adding worst model to basis
         if mpi.RANK_IS_MAIN:
             # Gram-Schmidt to get the next basis and normalize
-            self.matrix.append(misc.IMGS(self.matrix, worst_model, iter))
+            self.matrix.append(self._IMGS(worst_model, iter))
 
         # share the basis with ALL nodes
         matrix = mpi.COMM.bcast(self.matrix, root=mpi.MAIN_RANK)
         return matrix, pc_matrix, error_data
+
+    def _IMGS(self, next_vec, iter):
+        """what is this doing?"""
+        ortho_condition = 0.5
+        norm_prev = np.sqrt(np.vdot(next_vec, next_vec))
+        flag = False
+        while not flag:
+            next_vec, norm_current = self._MGS( next_vec, iter)
+            next_vec *= norm_current
+            if norm_current / norm_prev <= ortho_condition:
+                norm_prev = norm_current
+            else:
+                flag = True
+            norm_current = np.sqrt(np.vdot(next_vec, next_vec))
+            next_vec /= norm_current
+        return next_vec
+
+    def _MGS(self, next_vec, iter):
+        """what is this doing?"""
+        dim_RB = iter
+        for i in range(dim_RB):
+            # --- ortho_basis = ortho_basis - L2_proj*basis; ---
+            L2 = np.vdot(self.matrix[i], next_vec)
+            next_vec -= self.matrix[i] * L2
+        norm = np.sqrt(np.vdot(next_vec, next_vec))
+        next_vec /= norm
+        return next_vec, norm
+
+    def _project_onto_basis(self, integration_weights,  my_ts, iter):
+
+        pc = np.zeros(len(my_ts), dtype=self.model.model_dtype)
+        for j in range(len(my_ts)):
+            pc[j] = _dot_product(integration_weights, self.matrix[iter], my_ts[j])
+        return pc
 
     def _convert_to_basis_index(self, rank_number, rank_idx, rank_count):
         ranks_till_err_rank = [i for i in range(rank_number)]

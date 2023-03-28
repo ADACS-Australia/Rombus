@@ -1,6 +1,7 @@
 from typing import Callable, List, NamedTuple, Optional
 
 import numpy as np
+import rombus.exceptions as exceptions
 
 MAX_N_TRIES = 1000
 
@@ -37,19 +38,22 @@ class Params(object):
 
         new_sample: np.ndarray = np.ndarray(self.count, dtype=np.float64)
         n_tries = 0
-        while True:
-            for i, param in enumerate(self.params):
-                # N.B.: mypy struggles with NamedTuples, so typing is turned off for this next line
-                new_sample[i] = random_generator.uniform(low=param.min, high=param.max)  # type: ignore
-            param = self.np2param(new_sample)
-            if self._validate(param):
-                break
-            else:
-                n_tries = n_tries + 1
-                if n_tries >= MAX_N_TRIES:
-                    raise Exception(
-                        f"Max number of tries ({MAX_N_TRIES}) reached when trying to generate a valid random parameter set"
-                    )
+        try:
+            while True:
+                for i, param in enumerate(self.params):
+                    # N.B.: mypy struggles with NamedTuples, so typing is turned off for this next line
+                    new_sample[i] = random_generator.uniform(low=param.min, high=param.max)  # type: ignore
+                param = self.np2param(new_sample)
+                if self._validate(param):
+                    break
+                else:
+                    n_tries = n_tries + 1
+                    if n_tries >= MAX_N_TRIES:
+                        raise exceptions.RombusModelParamsError(
+                            f"Max number of tries ({MAX_N_TRIES}) reached when trying to generate a valid random parameter set"
+                        )
+        except exceptions.RombusException as e:
+            exceptions.handle_exception(e)
         return new_sample
 
     def np2param(self, params_np: np.ndarray) -> NamedTuple:

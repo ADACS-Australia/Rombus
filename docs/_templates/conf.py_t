@@ -42,6 +42,14 @@ extensions = [
 {%- endfor %}
 ]
 
+# Extensions for the Myst-Parser
+myst_enable_extensions = [
+    "attrs_inline",
+    "colon_fence",
+    "amsmath",
+    "dollarmath",
+]
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['{{ dot }}templates']
 

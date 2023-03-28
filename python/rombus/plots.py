@@ -4,7 +4,8 @@ from typing import Any, Dict, List
 
 import pylab as plt  # type: ignore
 
-from rombus.rom import ReducedOrderModel, ExceptionRomNotInitialised
+import rombus.exceptions as exceptions
+from rombus.rom import ReducedOrderModel
 
 
 def errors(err_list: List[float]) -> None:
@@ -41,18 +42,23 @@ def compare_rom_to_true(
     """Compare computed ROM to input model"""
 
     if ROM.model is None or ROM.empirical_interpolant is None:
-        raise ExceptionRomNotInitialised
+        raise exceptions.RomNotInitialised(
+            "ROM not initialised when generating comparison plot."
+        )
     else:
 
         # N.B.: mypy struggles with NamedTuples, so typing is turned off for the following
-        model_params = ROM.model.params.params_dtype(**model_params_in)  # type: ignore
+        model_params = ROM.model.sample(model_params_in)
+        # model_params = ROM.model.params.params_dtype(**model_params_in)  # type: ignore
 
         domain = ROM.model.domain
 
         model_full = ROM.model.compute(model_params, domain)
 
         if ROM.empirical_interpolant.nodes is None:
-            raise ExceptionRomNotInitialised
+            raise exceptions.RomNotInitialised(
+                "ROM's EmpiricalInterpolant is uninitialised when generating comparison plot"
+            )
         else:
             model_nodes = ROM.model.compute(
                 model_params, ROM.empirical_interpolant.nodes

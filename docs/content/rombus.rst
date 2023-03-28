@@ -57,3 +57,10 @@ rombus.plots
    :members:
    :undoc-members:
    :show-inheritance:
+
+rombus.exceptions
+~~~~~~~~~~~~~~~~~
+.. automodule:: rombus.exceptions
+   :members:
+   :undoc-members:
+   :show-inheritance:
