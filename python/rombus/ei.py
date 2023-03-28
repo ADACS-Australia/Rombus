@@ -15,12 +15,12 @@ DEFAULT_TOLERANCE = 1e-14
 DEFAULT_REFINE_N_RANDOM = 100
 
 
-def malloc(dtype, *nums):
+def _malloc(dtype, *nums):
     """Allocate some memory with given dtype"""
     return np.zeros(tuple(nums), dtype=dtype)
 
 
-class LinAlg:
+class _LinAlg:
     """Linear algebra functions needed for empirical interpolation class"""
 
     def __init__(self):
@@ -129,19 +129,19 @@ class LinAlg:
         return aT
 
 
-class EmpiricalInterpolation(LinAlg):
+class _EmpiricalInterpolation(_LinAlg):
     """
     Class for building an empirical interpolant
     """
 
     def __init__(self):
-        LinAlg.__init__(self)
+        _LinAlg.__init__(self)
 
-    def malloc_ei(self, Nbasis, Nquads, Nmodes=1, dtype="complex"):
-        self.indices = malloc("int", Nbasis)
-        self.invV = malloc(dtype, Nbasis, Nbasis)
-        self.R = malloc(dtype, Nbasis, Nquads)
-        self.B = malloc(dtype, Nbasis, Nquads)
+    def _malloc_ei(self, Nbasis, Nquads, Nmodes=1, dtype="complex"):
+        self.indices = _malloc("int", Nbasis)
+        self.invV = _malloc(dtype, Nbasis, Nbasis)
+        self.R = _malloc(dtype, Nbasis, Nquads)
+        self.B = _malloc(dtype, Nbasis, Nquads)
         pass
 
     def coefficient(self, invV, e, indices):
@@ -173,12 +173,12 @@ class EmpiricalInterpolation(LinAlg):
             return np.array([np.dot(h[ii][indices], B) for ii in range(dim[0])])
 
 
-class StandardEIM(EmpiricalInterpolation):
+class _StandardEIM(_EmpiricalInterpolation):
     def __init__(self, Nbasis, Nquads, Nmodes=1, dtype="complex"):
-        EmpiricalInterpolation.__init__(self)
+        _EmpiricalInterpolation.__init__(self)
 
         # Allocate memory for numpy arrays
-        self.malloc_ei(Nbasis, Nquads, Nmodes=Nmodes, dtype=dtype)
+        self._malloc_ei(Nbasis, Nquads, Nmodes=Nmodes, dtype=dtype)
         self.modes = Nmodes
         self.quads = Nquads
 
@@ -290,11 +290,12 @@ class EmpiricalInterpolant(object):
         if mpi.RANK_IS_MAIN:
             print("Computing empirical interpolant")
 
-        ######################################################
-        # TODO: move the code for these calls into this class
-        eim = StandardEIM(reduced_basis.matrix_shape[0], reduced_basis.matrix_shape[1])
+        eim = _StandardEIM(
+            reduced_basis.matrix_shape[0],
+            reduced_basis.matrix_shape[1],
+            dtype=reduced_basis.model.model_dtype,
+        )
         eim.make(reduced_basis.matrix)
-        ######################################################
 
         domain = reduced_basis.model.domain
         self.nodes = domain[eim.indices]

@@ -20,7 +20,7 @@ class model(RombusModel):
 
     # Set the domain over-and-on which the ROM will be defined
     def set_domain(self) -> ndarray:
-        return linspace(0, 20, 100)
+        return linspace(0, 10, 11)
 
     def compute(self, p: NamedTuple, x: ndarray) -> ndarray:
         """Compute the model for a given parameter set."""
@@ -30,20 +30,10 @@ and specify a set of points (in this case, the file `my_model_samples.py`) to bu
 ```
 -10, -10,-10
 -10,  10,-10
--10, -10,  0
--10,  10,  0
 -10, -10, 10
 -10,  10, 10
-  0, -10,-10
-  0,  10,-10
-  0, -10,  0
-  0,  10,  0
-  0, -10, 10
-  0,  10, 10
  10, -10,-10
  10,  10,-10
- 10, -10,  0
- 10,  10,  0
  10, -10, 10
  10,  10, 10
 ```
@@ -54,10 +44,25 @@ $ rombus build my_model:model my_model_samples.csv
 This produces an _HDF5_ file named `my_model.hdf5`.  You can then use your new ROM in
 your Python projects like this:
 ```
-from rombus import ReducedOrderModel
+from rombus.rom import ReducedOrderModel
 
 ROM = ReducedOrderModel.from_file('my_model.hdf5')
-sample = ROM.model.sample({"a0":2.0,"a1":1.5,"a2":3.0})
+sample = ROM.model.sample({"a0":0,"a1":0,"a2":1})
 model_ROM = ROM.evaluate(sample)
+for x, y in zip(ROM.model.domain,model_ROM):
+    print(f"{x:.2f} {y:.2f}")
 ```
-
+which generates the output:
+```
+0.00 0.00
+1.00 1.00
+2.00 4.00
+3.00 9.00
+4.00 16.00
+5.00 25.00
+6.00 36.00
+7.00 49.00
+8.00 64.00
+9.00 81.00
+10.00 100.00
+```

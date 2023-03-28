@@ -32,10 +32,10 @@ class RombusException(Exception):
 # rombus.ei exceptions
 
 
-class ReducedEIError(RombusException):
-    """Raised when ."""
-
-    pass
+# class ReducedEIError(RombusException):
+#    """Raised when ."""
+#
+#    pass
 
 
 # rombus.model exceptions
@@ -62,28 +62,28 @@ class RombusModelInitError(RombusException):
 # rombus.params exceptions
 
 
-class ReducedParamsError(RombusException):
-    """Raised when ."""
-
-    pass
+# class ReducedParamsError(RombusException):
+#    """Raised when ."""
+#
+#    pass
 
 
 # rombus.plots exceptions
 
 
-class ReducedPlotsError(RombusException):
-    """Raised when ."""
-
-    pass
+# class ReducedPlotsError(RombusException):
+#    """Raised when ."""
+#
+#    pass
 
 
 # rombus.samples exceptions
 
 
-class ReducedSamplesError(RombusException):
-    """Raised when ."""
-
-    pass
+# class ReducedSamplesError(RombusException):
+#    """Raised when ."""
+#
+#    pass
 
 
 # rombus.reduced_basis exceptions
