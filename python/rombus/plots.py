@@ -9,6 +9,13 @@ from rombus.rom import ReducedOrderModel
 
 
 def errors(err_list: List[float]) -> None:
+    """Generate plot of errors.
+
+    Parameters
+    ----------
+    err_list : List[float]
+        List of errors
+    """
     plt.plot(err_list)
     plt.xlabel("# Basis elements")
     plt.ylabel("Error")
@@ -18,6 +25,13 @@ def errors(err_list: List[float]) -> None:
 
 
 def basis(rb_matrix: List[np.ndarray]) -> None:
+    """Generate a plot of the Reduced Bases.
+
+    Parameters
+    ----------
+    rb_matrix : List[np.ndarray]
+        List of reduced bases
+    """
     num_elements = len(rb_matrix)
     total_frames = 125
     n_models_per_frame = int(num_elements / total_frames)
@@ -39,7 +53,15 @@ def basis(rb_matrix: List[np.ndarray]) -> None:
 def compare_rom_to_true(
     ROM: ReducedOrderModel, model_params_in: Dict[str, Any]
 ) -> None:
-    """Compare computed ROM to input model"""
+    """Generate a plot comparing the ROM to the original source model for a given set of parameters.
+
+    Parameters
+    ----------
+    ROM : ReducedOrderModel
+        The Reduced Order Model to make the comparison for
+    model_params_in : Dict[str, Any]
+        A dictionary of parameters to use as the input parameters
+    """
 
     if ROM.model is None or ROM.empirical_interpolant is None:
         raise exceptions.RomNotInitialised(

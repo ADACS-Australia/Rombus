@@ -20,13 +20,13 @@ FLEX_CONTEXT_SETTINGS = dict(
 
 
 class _OrderedGroup(click.Group):
-    """This class is used to ensure that the ordering of the CLI subcommands
-    are in code-order in the CLI help and documentation."""
+    """This class is used to ensure that the ordering of the CLI subcommands are in code-order in the CLI help and documentation."""
 
     def __init__(self, name=None, commands=None, **attrs):
         super(_OrderedGroup, self).__init__(name, commands, **attrs)
         #: the registered subcommands by their exported names.
         self.commands = commands or collections.OrderedDict()
+        """An ordered dict of the registered commands"""
 
     def list_commands(self, ctx: click.core.Context):
         return self.commands
@@ -35,7 +35,12 @@ class _OrderedGroup(click.Group):
 @click.group(cls=_OrderedGroup, context_settings=CONTEXT_SETTINGS)
 @click.pass_context
 def cli(ctx: click.core.Context) -> None:
-    """Perform greedy algorythm operations with Rombus"""
+    """Build and work with Reduced Order Models (ROMs) with Rombus.
+
+    Please see the Rombus documentation at https://rombus.readthedocs.io for information about how to work with Rombus.
+
+    N.B.: The commands listed below are roughly in the order that most users will need to use them.
+    """
 
     # ensure that ctx.obj exists and is a dict (in case `cli()` is called
     # by means other than the `if` block below)
@@ -45,7 +50,7 @@ def cli(ctx: click.core.Context) -> None:
 @cli.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("project_name", type=str)
 def quickstart(project_name: str) -> None:
-    """Write a project template to build a new project from"""
+    """Write a project template to kickstart the creation of a new project."""
 
     RombusModel.write_project_template(project_name)
 
@@ -75,10 +80,7 @@ def build(
     out: str,
     do_step: click.Choice,
 ) -> None:
-    """Build a reduced order model
-
-    FILENAME_IN is the 'greedy points' numpy or csv file to take as input
-    """
+    """Build a Reduced Order Model."""
 
     # Load model
     try:
@@ -105,7 +107,7 @@ def build(
 @click.argument("filename_ROM", type=click.Path(exists=True))
 @click.pass_context
 def refine(ctx: click.core.Context, filename_rom: str) -> None:
-    """Refine parameter sampling to impove a reduced order model"""
+    """Refine parameter sampling to improve an established reduced order model."""
 
     # Build model and refine it
     ROM = ReducedOrderModel.from_file(filename_rom).refine()
@@ -123,9 +125,10 @@ def refine(ctx: click.core.Context, filename_rom: str) -> None:
 def evaluate(
     ctx: click.core.Context, filename_rom: str, parameters: Tuple[str, ...]
 ) -> None:
-    """Evaluate a reduced order model and compare it to truth
+    """Evaluate a reduced order model and compare it to truth.
 
-    PARAMETERS is a list of parameter values of the form A=VAL B=VAL ..."""
+    PARAMETERS is a list of parameter values of the form A=VAL B=VAL ...
+    """
 
     # Read ROM
     ROM = ReducedOrderModel.from_file(filename_rom)
@@ -148,7 +151,7 @@ def evaluate(
 )
 @click.pass_context
 def timing(ctx: click.core.Context, filename_rom: str, n_samples: int) -> None:
-    """Compute timing information for a ROM and it's source model"""
+    """Compute timing information for a ROM and it's source model."""
 
     # Read ROM
     ROM = ReducedOrderModel.from_file(filename_rom)

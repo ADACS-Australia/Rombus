@@ -257,13 +257,7 @@ class _StandardEIM(_EmpiricalInterpolation):
 
 
 class EmpiricalInterpolant(object):
-    """Class for managing the creation of empirical interpolants (EIs)
-
-    Attributes
-    ----------
-    B_matrix : Basis matrix
-    nodes : Interpolant nodes
-    """
+    """Class for managing the creation of empirical interpolants (EIs)"""
 
     def __init__(
         self, B_matrix: np.ndarray = np.ndarray([]), nodes: np.ndarray = np.ndarray([])
@@ -271,7 +265,10 @@ class EmpiricalInterpolant(object):
         """Initialise empirical interpolant"""
 
         self.B_matrix = B_matrix
+        """Basis matrix"""
+
         self.nodes = nodes
+        """Interpolant nodes"""
 
     def compute(self, reduced_basis: ReducedBasis) -> Self:
         """Compute empirical interpolant for a given reduced basis

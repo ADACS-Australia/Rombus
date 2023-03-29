@@ -9,6 +9,10 @@ Rombus API Documentation
 Submodules
 ----------
 
+.. contents:: The following submodules are available through the Rombus API:
+   :local:
+   :depth: 2
+
 rombus.model
 ~~~~~~~~~~~~
 .. automodule:: rombus.model
