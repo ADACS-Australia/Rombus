@@ -5,7 +5,7 @@ import h5py  # type: ignore
 import mpi4py
 import numpy as np
 
-from typing import Optional, Self
+from typing import Optional, Self, NamedTuple
 
 import rombus._core.mpi as mpi
 import rombus._core.hdf5 as hdf5
@@ -20,6 +20,8 @@ DEFAULT_REFINE_N_RANDOM: int = 100
 
 
 class ReducedOrderModel(object):
+    """Class for managing the creation, updating and subsequent use of a Reduced Order Model (ROM)."""
+
     def __init__(
         self,
         model: RombusModelType,
@@ -30,63 +32,31 @@ class ReducedOrderModel(object):
     ):
 
         self.model: RombusModel = RombusModel.load(model)
+        """Model used to generate the ROM"""
 
         self.samples = samples
+        """Samples fed to the greedy algorithm to generate the ROM"""
+
         self.reduced_basis = reduced_basis
+        """ReducedBasis generated for the ROM"""
+
         self.empirical_interpolant = empirical_interpolant
-
-    def build(self, do_step=None, tol=DEFAULT_TOLERANCE):
-
-        if do_step is None or do_step == "RB":
-            try:
-                self.reduced_basis = ReducedBasis().compute(
-                    self.model, self.samples, tol=tol
-                )
-            except exceptions.RombusException as e:
-                e.handle_exception()
-
-        if do_step is None or do_step == "EI":
-            if self.reduced_basis is None:
-                raise Exception
-            self.empirical_interpolant = EmpiricalInterpolant().compute(
-                self.reduced_basis
-            )
-
-        return self
-
-    def refine(
-        self, n_random=DEFAULT_REFINE_N_RANDOM, tol=DEFAULT_TOLERANCE, iterate=True
-    ):
-
-        if self.reduced_basis is None:
-            self.reduced_basis = ReducedBasis().compute(
-                self.model, Samples(self.model, n_random=n_random), tol=tol
-            )
-        self._validate_and_refine_basis(n_random, tol=tol, iterate=iterate)
-
-        self.empirical_interpolant = EmpiricalInterpolant().compute(self.reduced_basis)
-
-        return self
-
-    def evaluate(self, params):
-        _signal_at_nodes = self.model.compute(params, self.empirical_interpolant.nodes)
-        return np.dot(_signal_at_nodes, np.real(self.empirical_interpolant.B_matrix))
-
-    def write(self, filename):
-        """Save ROM to file"""
-        with h5py.File(filename, "w") as h5file:
-            self.model.write(h5file)
-            self.samples.write(h5file)
-            if self.reduced_basis is not None:
-                self.reduced_basis.write(h5file)
-            if self.empirical_interpolant is not None:
-                self.empirical_interpolant.write(h5file)
+        """EmpiricalInterpolant generated for the ROM"""
 
     @classmethod
     def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
-        """Create a ROM instance from a file.
+        """Instantiate a ROM from a Rombus HDF5 file.
 
-        If given an open HDF5 file, then use it.  If given a valid filename then open it for reading but close it when done."""
+        Parameters
+        ----------
+        file_in : hdf5.FileOrFilename
+            Rombus file (filename or opened file) to read from
+
+        Returns
+        -------
+        Self
+            Return a reference to self so that methods can be chained.
+        """
 
         h5file, close_file = hdf5.ensure_open(file_in)
 
@@ -107,7 +77,128 @@ class ReducedOrderModel(object):
             empirical_interpolant=empirical_interpolant,
         )
 
+    def build(
+        self, do_step: Optional[str] = None, tol: float = DEFAULT_TOLERANCE
+    ) -> Self:
+        """(Re)build a ReducedOrderModel.
+
+        Parameters
+        ----------
+        do_step : str|None
+            Specify whether to just compute the ReducedBasis ('RB') or the EmpiricalInterpolant ('EI') or both (None)
+        tol : float
+            Absolute error tolerance when building the reduced basis
+
+        Returns
+        -------
+        Self
+            Returns a reference to self, so that method calls can be chained
+        """
+
+        if do_step is None or do_step == "RB":
+            try:
+                self.reduced_basis = ReducedBasis().compute(
+                    self.model, self.samples, tol=tol
+                )
+            except exceptions.RombusException as e:
+                e.handle_exception()
+
+        if do_step is None or do_step == "EI":
+            if self.reduced_basis is None:
+                raise exceptions.ReducedBasisNotComputedError(
+                    "A ROM whose ReducedBasis has not been computed has been asked to comput its EmpiricalInterpolant.  Compute the ReducedBasis first and try again."
+                )
+            self.empirical_interpolant = EmpiricalInterpolant().compute(
+                self.reduced_basis
+            )
+
+        return self
+
+    def evaluate(self, params: NamedTuple) -> np.ndarray:
+        """Evaluate the ROM for a given set of parameters.
+
+        Parameters
+        ----------
+        params : NamedTuple
+            The parameters to evaluate the model for
+
+        Returns
+        -------
+        np.ndarray
+            The ROM evaluation of the model
+        """
+        if self.empirical_interpolant is None:
+            raise exceptions.EmpiricalInterpolantNotComputedError(
+                "An attempt has been made to evaluate a ROM whose EmpiricalInterpolant has not been computed.  Compute the EmpiricalInterpolant and try again."
+            )
+        _signal_at_nodes = self.model.compute(params, self.empirical_interpolant.nodes)
+        return np.dot(_signal_at_nodes, np.real(self.empirical_interpolant.B_matrix))
+
+    def refine(
+        self,
+        n_random: int = DEFAULT_REFINE_N_RANDOM,
+        tol: float = DEFAULT_TOLERANCE,
+        iterate: bool = True,
+    ) -> Self:
+        """Refine the model by attempting to add new samples to it.
+
+        Parameters
+        ----------
+        n_random : int
+            Number of random samples to generate per iteration
+        tol : float
+            The absolute tolerance to use when evaluating the errors of each sample
+        iterate : bool
+            Flag that sets whether to iteratively refine until no new samples are added.
+
+        Returns
+        -------
+        Self
+            Returns self so that methods can be chained
+        """
+
+        if self.reduced_basis is None:
+            self.reduced_basis = ReducedBasis().compute(
+                self.model, Samples(self.model, n_random=n_random), tol=tol
+            )
+        self._validate_and_refine_basis(n_random, tol=tol, iterate=iterate)
+
+        self.empirical_interpolant = EmpiricalInterpolant().compute(self.reduced_basis)
+
+        return self
+
+    def write(self, filename: str) -> None:
+        """Save the ROM to a Rombus HDF5 file.
+
+        Parameters
+        ----------
+        filename : str
+            Filename of the output file
+        """
+        with h5py.File(filename, "w") as h5file:
+            self.model.write(h5file)
+            self.samples.write(h5file)
+            if self.reduced_basis is not None:
+                self.reduced_basis.write(h5file)
+            if self.empirical_interpolant is not None:
+                self.empirical_interpolant.write(h5file)
+
     def timing(self, samples: Samples) -> float:
+        """Generate timing information for the ROM.  Particularly useful when compared to
+        similar timing information computed for the source model it is derived from.
+
+        Parameters
+        ----------
+        samples : "Samples"
+            A set of parameters to generate timing information for.  Should be the same as those used when
+            timiing the source model, if comparisons are to be made.
+
+        Returns
+        -------
+        float
+            Seconds elapsed
+        """
+
         start_time = timeit.default_timer()
         for i, sample in enumerate(samples.samples):
             params_numpy = self.model.params.np2param(sample)
@@ -118,6 +209,17 @@ class ReducedOrderModel(object):
         self, n_random: int, tol: float = DEFAULT_TOLERANCE, iterate: bool = True
     ) -> None:
 
+        """Perform ROM refinement.
+
+        Parameters
+        ----------
+        n_random : int
+            Number of random samples to generate per iteration
+        tol : float
+            Absolute tolerance to use when assessing errors
+        iterate : bool
+            Flag that sets whether to iteratively refine until no new samples are added.
+        """
         if not self.reduced_basis:
             self.reduced_basis = ReducedBasis().compute(
                 self.model, self.samples, tol=tol

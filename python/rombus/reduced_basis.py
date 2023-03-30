@@ -13,6 +13,7 @@ from rombus.model import RombusModel, RombusModelType
 DEFAULT_TOLERANCE = 1e-14
 DEFAULT_REFINE_N_RANDOM = 100
 
+
 def _get_highest_error(error_list):
     rank, idx, err = -np.inf, -np.inf, -np.inf
     for rank_id, rank_errors in enumerate(error_list):
@@ -23,12 +24,16 @@ def _get_highest_error(error_list):
             rank = rank_id
     return rank, idx, np.float64(err.real)
 
+
 def _dot_product(weights, a, b):
 
     assert len(a) == len(b)
     return np.vdot(a * weights, b)
 
+
 class ReducedBasis(object):
+    """Class for managing the creation of reduced basis sets."""
+
     def __init__(
         self,
         matrix: List[np.ndarray] = [],
@@ -38,25 +43,66 @@ class ReducedBasis(object):
     ):
         try:
             self.matrix = matrix
+            """List of matrices, storing the reduced bases"""
+
             self.greedypoints = greedypoints
+            """List of matrices, storing the selected greedy points"""
+
             self.error_list = error_list
+            """Errors calculated for each basis"""
+
+            self.matrix_shape: List[int]
+            """Shape of the reduced basis matrix"""
             self._set_matrix_shape()
         except exceptions.RombusException as e:
             e.handle_exception()
 
-    def _set_matrix_shape(self) -> None:
-        mtx_len = len(self.matrix)
-        self.matrix_shape = [mtx_len]
-        if mtx_len > 0:
-            mtx_dim = self.matrix[-1].shape
-            for dim in mtx_dim:
-                self.matrix_shape.append(dim)
-        else:
-            self.matrix_shape.append(0)
+    @classmethod
+    def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
+        """Instantiate a reduced basis from a Rombus file on disk.
+
+        Parameters
+        ----------
+        file_in : hdf5.FileOrFilename
+            HDF5 file (filename or opend file) to read from
+
+        Returns
+        -------
+        Self
+            Returns a reference to self so that method calls can be chained
+        """
+
+        h5file, close_file = hdf5.ensure_open(file_in)
+
+        matrix = [np.array(x) for x in h5file["reduced_basis/matrix"]]
+        greedypoints = [np.array(x) for x in h5file["reduced_basis/greedypoints"]]
+        error_list = [x for x in h5file["reduced_basis/error_list"]]
+
+        if close_file:
+            h5file.close()
+
+        return cls(matrix=matrix, greedypoints=greedypoints, error_list=error_list)
 
     def compute(
         self, model: RombusModelType, samples: Samples, tol: float = DEFAULT_TOLERANCE
     ) -> Self:
+
+        """Compute a reduced basis for a given model and set of parameters.
+
+        Parameters
+        ----------
+        model : RombusModelType
+            Rombus model to compute the reduced basis for
+        samples : Samples
+            Set of parameter samples for the greedy algorithm to select from
+        tol : float
+            The absolute tolerance in the error for the greedy algorythm to use for sample selection
+
+        Returns
+        -------
+        Self
+            Returns a reference to self, so that method calls can be chained.
+        """
 
         self.model: RombusModel = RombusModel.load(model)
 
@@ -100,33 +146,34 @@ class ReducedBasis(object):
         return self
 
     def write(self, h5file: hdf5.File) -> None:
-        """Save samples to file"""
+        """Save reduced basis to file.
+
+        Parameters
+        ----------
+        h5file : hdf5.File
+            Open HDF5 file to read from
+        """
 
         h5_group = h5file.create_group("reduced_basis")
         h5_group.create_dataset("matrix", data=self.matrix)
         h5_group.create_dataset("greedypoints", data=self.greedypoints)
         h5_group.create_dataset("error_list", data=self.error_list)
 
-    @classmethod
-    def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
-        """Create a ROM instance from a file"""
-
-        h5file, close_file = hdf5.ensure_open(file_in)
-
-        matrix = [np.array(x) for x in h5file["reduced_basis/matrix"]]
-        greedypoints = [np.array(x) for x in h5file["reduced_basis/greedypoints"]]
-        error_list = [x for x in h5file["reduced_basis/error_list"]]
-
-        if close_file:
-            h5file.close()
-
-        return cls(matrix=matrix, greedypoints=greedypoints, error_list=error_list)
+    def _set_matrix_shape(self) -> None:
+        mtx_len = len(self.matrix)
+        self.matrix_shape = [mtx_len]
+        if mtx_len > 0:
+            mtx_dim = self.matrix[-1].shape
+            for dim in mtx_dim:
+                self.matrix_shape.append(dim)
+        else:
+            self.matrix_shape.append(0)
 
     def _add_next_model_to_basis(
         self, pc_matrix: List[np.ndarray], my_ts: np.ndarray, iter: int
     ) -> Tuple[List[np.ndarray], List[np.ndarray], Tuple[int, int, int]]:
         # project training set on basis + get errors
-        pc = self._project_onto_basis( 1.0, my_ts, iter - 1)
+        pc = self._project_onto_basis(1.0, my_ts, iter - 1)
         pc_matrix.append(pc)
 
         projection_errors = list(
@@ -175,7 +222,7 @@ class ReducedBasis(object):
         norm_prev = np.sqrt(np.vdot(next_vec, next_vec))
         flag = False
         while not flag:
-            next_vec, norm_current = self._MGS( next_vec, iter)
+            next_vec, norm_current = self._MGS(next_vec, iter)
             next_vec *= norm_current
             if norm_current / norm_prev <= ortho_condition:
                 norm_prev = norm_current
@@ -196,7 +243,7 @@ class ReducedBasis(object):
         next_vec /= norm
         return next_vec, norm
 
-    def _project_onto_basis(self, integration_weights,  my_ts, iter):
+    def _project_onto_basis(self, integration_weights, my_ts, iter):
 
         pc = np.zeros(len(my_ts), dtype=self.model.model_dtype)
         for j in range(len(my_ts)):

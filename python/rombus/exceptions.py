@@ -1,4 +1,4 @@
-import sys
+import traceback
 
 ERROR_ROMBUS_INTERNAL_EXCEPTION = 101
 ERROR_ROMBUS_EXTERNAL_EXCEPTION = 102
@@ -13,7 +13,9 @@ def handle_exception(
         print("A non-Rombus exception was encountered:")
     print(f"  type: {type(exception).__name__}")
     print(f"  message:\n{exception}")
-    sys.exit(code)
+    print("\n")
+    traceback.print_exception(exception)
+    # sys.exit(code)
 
 
 class RombusException(Exception):
@@ -32,10 +34,10 @@ class RombusException(Exception):
 # rombus.ei exceptions
 
 
-# class ReducedEIError(RombusException):
-#    """Raised when ."""
-#
-#    pass
+class EmpiricalInterpolantNotComputedError(RombusException):
+    """Raised when an EmpiricalInterpolant operation is attempted on a ROM whose EI has not yet been computed."""
+
+    pass
 
 
 # rombus.model exceptions
@@ -91,6 +93,12 @@ class RombusModelInitError(RombusException):
 
 class ReducedBasisInitError(RombusException):
     """Raised when a ReducedBasis object can not be initialised."""
+
+    pass
+
+
+class ReducedBasisNotComputedError(RombusException):
+    """Raised when an EmpiricalInterpolant operation is attempted on a ROM whose EI has not yet been computed."""
 
     pass
 

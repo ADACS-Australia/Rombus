@@ -357,6 +357,7 @@ def _import_from_string(import_str: str) -> Any:
     Any
         An instance of the user-defined model class
     """
+
     if not isinstance(import_str, str):
         raise exceptions.RombusModelImportFromStringError(
             f'Import string must be a string with format "<module>:<attribute>".  It is actually of type {type(import_str)}.'

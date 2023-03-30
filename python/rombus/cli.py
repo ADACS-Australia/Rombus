@@ -5,6 +5,7 @@ import click
 import collections
 
 import rombus.plots as plots
+import rombus.exceptions as exceptions
 
 from rombus.model import RombusModel
 from rombus.samples import Samples
@@ -52,7 +53,10 @@ def cli(ctx: click.core.Context) -> None:
 def quickstart(project_name: str) -> None:
     """Write a project template to kickstart the creation of a new project."""
 
-    RombusModel.write_project_template(project_name)
+    try:
+        RombusModel.write_project_template(project_name)
+    except exceptions.RombusException as e:
+        e.handle_exception()
 
 
 @cli.command(context_settings=CONTEXT_SETTINGS)
@@ -85,22 +89,27 @@ def build(
     # Load model
     try:
         model_loaded = RombusModel.load(model)
-    except Exception as e:
-        print(f"Error encountered: {e}")
-        exit(1)
+    except exceptions.RombusException as e:
+        e.handle_exception()
 
     # Load samples
     samples = Samples(model_loaded, filename=filename_samples)
 
-    # Build ROM
-    ROM = ReducedOrderModel(model_loaded, samples).build(do_step=do_step)
+    try:
+        # Build ROM
+        assert do_step is None or type(do_step) == str  # keeping mypy happy
+        ROM = ReducedOrderModel(model_loaded, samples).build(do_step=do_step)
 
-    # Write ROM
-    if out == "MODEL_BASENAME.hdf5":
-        filename_out = f"{model_loaded.model_basename}.hdf5"
-    else:
-        filename_out = out
-    ROM.write(filename_out)
+        # Write ROM
+        if out == "MODEL_BASENAME.hdf5":
+            filename_out = f"{model_loaded.model_basename}.hdf5"
+        else:
+            filename_out = out
+            ROM.write(filename_out)
+    except exceptions.RombusException as e:
+        e.handle_exception()
+    except AssertionError as e:
+        exceptions.handle_exception(e)
 
 
 @cli.command(context_settings=CONTEXT_SETTINGS)
@@ -109,13 +118,16 @@ def build(
 def refine(ctx: click.core.Context, filename_rom: str) -> None:
     """Refine parameter sampling to improve an established reduced order model."""
 
-    # Build model and refine it
-    ROM = ReducedOrderModel.from_file(filename_rom).refine()
+    try:
+        # Build model and refine it
+        ROM = ReducedOrderModel.from_file(filename_rom).refine()
 
-    # Write results
-    filename_split = filename_rom.rsplit(".", 1)
-    filename_out = f"{filename_split[0]}_refined.{filename_split[1]}"
-    ROM.write(filename_out)
+        # Write results
+        filename_split = filename_rom.rsplit(".", 1)
+        filename_out = f"{filename_split[0]}_refined.{filename_split[1]}"
+        ROM.write(filename_out)
+    except exceptions.RombusException as e:
+        e.handle_exception()
 
 
 @cli.command(context_settings=FLEX_CONTEXT_SETTINGS)
@@ -130,14 +142,18 @@ def evaluate(
     PARAMETERS is a list of parameter values of the form A=VAL B=VAL ...
     """
 
-    # Read ROM
-    ROM = ReducedOrderModel.from_file(filename_rom)
+    try:
+        # Read ROM
+        ROM = ReducedOrderModel.from_file(filename_rom)
 
-    # Parse the model parameters, which should have been given as arguments
-    model_params = ROM.model.parse_cli_params(parameters)
+        # Parse the model parameters, which should have been given as arguments
+        model_params = ROM.model.parse_cli_params(parameters)
 
-    # Generate plot
-    plots.compare_rom_to_true(ROM, model_params)
+        # Generate plot
+        plots.compare_rom_to_true(ROM, model_params)
+
+    except exceptions.RombusException as e:
+        e.handle_exception()
 
 
 @cli.command(context_settings=FLEX_CONTEXT_SETTINGS)
@@ -153,17 +169,20 @@ def evaluate(
 def timing(ctx: click.core.Context, filename_rom: str, n_samples: int) -> None:
     """Compute timing information for a ROM and it's source model."""
 
-    # Read ROM
-    ROM = ReducedOrderModel.from_file(filename_rom)
+    try:
+        # Read ROM
+        ROM = ReducedOrderModel.from_file(filename_rom)
 
-    # Generate the samples to be used
-    timing_sample = Samples(ROM.model, n_random=n_samples)
+        # Generate the samples to be used
+        timing_sample = Samples(ROM.model, n_random=n_samples)
 
-    # Generate timing information for model
-    timing_model = ROM.model.timing(timing_sample)
+        # Generate timing information for model
+        timing_model = ROM.model.timing(timing_sample)
 
-    # Generate timing information for ROM
-    timing_ROM = ROM.timing(timing_sample)
+        # Generate timing information for ROM
+        timing_ROM = ROM.timing(timing_sample)
+    except exceptions.RombusException as e:
+        e.handle_exception()
 
     # Report results
     print(

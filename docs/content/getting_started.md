@@ -3,18 +3,19 @@ Getting Started
 
 Getting started with Rombus is easy.  To install it you just need to run the following command:
 ```console
-pip install rombus
+$ pip install rombus
 ```
 Once that's done, you need just two things to build a Reduced Order Model (ROM):
-1. an _appropriately defined Python class_ (more on that below) placed somewhere in your Python path (for example, in a pip-installed package or simply a Python file sitting in your current directory), and
-2. a _file listing a set of parameter samples_ to be used to construct the model.
+1. an ___appropriately defined Python class___ (more on that below) placed somewhere in your Python path or in your current working directory, and
+2. a ___file listing a set of parameter samples___ to be used to construct the model.
+
 Let's give this a try for the trivial example of the function: $sinc(Ax)=sin(Ax)/(Ax)$
 :::{tip}
 The files used in what follows can be easily generated using the following quickstart command:
 ```sh
 $ rombus quickstart my_project
 ```
-This is a good way to quickly generate a project template for your new Rombus projects.
+This is a good way to quickly generate a project template which you can then modify for your new Rombus projects.
 :::
 First we need to define a model class.  We place the following code into a file called `my_project.py`:
 ```Python
@@ -78,7 +79,7 @@ follows:
 $ rombus build sinc:model sinc_samples.csv
 ```
 ::: {note}
-Note the syntax for specifying the model: **sub.module.name:class_name**
+Note the syntax for specifying the model: **sub.module.name:class_name**.  You should omit the `.py` from the filename.
 :::
 This should generate our ROM and place it in an _.hdf5_ file named `my_project.hdf5`.  Let's see how accurate it is:
 ```console
@@ -127,11 +128,10 @@ Timing information for ROM:   1.41e-01s for 100 calls (1.41e-03 per sample).
 Timing information for model: 1.38e-02s for 100 calls (1.38e-04 per sample).
 ROM is 10.16X slower than the source model.
 ```
+**Now, go ahead and try to generate your own model.  Just modify `my_project.py` and `my_project_samples.csv` to suit your needs and repeat
+the steps above.**
 ::: {note}
 Usually, Rombus won't be used to generate representations of trivial models such as this.  It excels at furnishing representations of models
 which can take minites-to-weeks of CPU time to generate.  Once a ROM is successfuly built for such a model, analyses can be performed with
 many orders of magnitude of speed-up.
 :::
-**Now, go ahead and try to generate your own model.  Just modify `my_project.py` and `my_project_samples.csv` to suit your needs and repeat
-the steps above.**
-

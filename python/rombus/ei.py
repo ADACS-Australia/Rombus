@@ -318,7 +318,18 @@ class EmpiricalInterpolant(object):
 
     @classmethod
     def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
-        """Create a ROM instance from a file"""
+        """Instantiate an EmpiricalInterpolant from a Rombus file.
+
+        Parameters
+        ----------
+        file_in : hdf5.FileOrFilename
+            Rombus file (filename or open file) to read from
+
+        Returns
+        -------
+        Self
+            Returns a reference to self, so that method calls can be chained
+        """
 
         try:
             h5file, close_file = hdf5.ensure_open(file_in)
