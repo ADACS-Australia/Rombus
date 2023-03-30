@@ -12,35 +12,31 @@ respectively.
 from __future__ import print_function
 from functools import update_wrapper
 
-import os
 import sys
-import importlib
 import time
 import datetime
 
 import inspect
 from functools import wraps
 
-# Infer the name of this package from the path of __file__
-package_parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-package_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-package_name = os.path.basename(package_root_dir)
-
-# Make sure that what's in this path takes precedence
-# over an installed version of the project
-sys.path.insert(0, package_parent_dir)
-
-# Import needed internal modules
-pkg = importlib.import_module(package_name)
-_internal = importlib.import_module(package_name + '._internal')
-
 intervals = (
-    ('weeks', 604800),  # 60 * 60 * 24 * 7
-    ('days', 86400),    # 60 * 60 * 24
-    ('hours', 3600),    # 60 * 60
-    ('minutes', 60),
-    ('seconds', 1),
+    ("weeks", 604800),  # 60 * 60 * 24 * 7
+    ("days", 86400),  # 60 * 60 * 24
+    ("hours", 3600),  # 60 * 60
+    ("minutes", 60),
+    ("seconds", 1),
 )
+
+string_types = (str, bytes)
+
+
+def is_nonstring_iterable(object_in):
+    """Determine if an object is a non-string iterable.
+
+    :param object: An object of any type.
+    :return: Boolean.  True if object is a non-string iterable.
+    """
+    return hasattr(object_in, "__iter__") and not isinstance(object_in, string_types)
 
 
 def format_time(seconds, granularity=None):
@@ -56,22 +52,22 @@ def format_time(seconds, granularity=None):
         value = seconds // count
         if value:
             seconds -= value * count
-            if(name == intervals[-1][0] or i_interval == granularity):
+            if name == intervals[-1][0] or i_interval == granularity:
                 result.append("%.1f %s" % (value, name))
             else:
                 if value == 1:
-                    name = name.rstrip('s')
+                    name = name.rstrip("s")
                 result.append("%d %s" % (value, name))
 
-    if(granularity):
-        result = ', '.join(result[:granularity])
+    if granularity:
+        result = ", ".join(result[:granularity])
     else:
-        result = ', '.join(result)
+        result = ", ".join(result)
 
     # Replace the last ',' with ' and'
-    result_split = result.rsplit(',', 1)
-    if(len(result_split) > 1):
-        result = ' and'.join(result_split)
+    result_split = result.rsplit(",", 1)
+    if len(result_split) > 1:
+        result = " and".join(result_split)
 
     return result
 
@@ -119,7 +115,7 @@ class log_stream(object):
         self.t_last.append(time.time())
         self.n_lines.append(0)
         self.splice.append(splice)
-        if(splice):
+        if splice:
             self._splice_line(splice, True)
 
     def close(self, msg=None, time_elapsed=False):
@@ -133,7 +129,7 @@ class log_stream(object):
         """
 
         # Sanity checks
-        if(self._n_indent() < 1):
+        if self._n_indent() < 1:
             self.error(Exception("Invalid log closure."))
 
         # Decrement the indent level and fetch the info about the level we are closing
@@ -145,20 +141,27 @@ class log_stream(object):
         # pop on t_last to keep track of the indenting level
         dt = time.time() - t_last
 
-        if(splice):
+        if splice:
             self._splice_line(splice, False)
 
         # Generate message
-        if(msg is not None):
-            msg_time = ''
-            if(time_elapsed):
+        if msg is not None:
+            msg_time = ""
+            if time_elapsed:
                 dt_txt = format_time(dt)
-                if(len(dt_txt) > 0):
+                if len(dt_txt) > 0:
                     msg_time = " (%s)" % (dt_txt)
             self._print(msg + msg_time, unhang=(n_lines > 1))
         self._unhang()
 
-    def callable(self, msg=None, dump_args=False, dump_returns=False, time_elapsed=False, default_verbosity='unset'):
+    def callable(
+        self,
+        msg=None,
+        dump_args=False,
+        dump_returns=False,
+        time_elapsed=False,
+        default_verbosity="unset",
+    ):
         """Decorator to add in-bound and out-bound logging to a callable.
 
         :param msg: string describing in-bound logging message
@@ -170,7 +173,7 @@ class log_stream(object):
         """
 
         def decorated_callable(func):
-            if default_verbosity != 'unset':
+            if default_verbosity != "unset":
                 func = self.add_verbosity(default=default_verbosity)(func)
 
             @wraps(func)
@@ -181,31 +184,33 @@ class log_stream(object):
                 if msg:
                     self.open(msg)
                 else:
-                    self.open("Calling %s.%s()..." % (func.__module__, func.__qualname__))
+                    self.open(
+                        "Calling %s.%s()..." % (func.__module__, func.__qualname__)
+                    )
 
                 # Report arguments
-                if (dump_args):
+                if dump_args:
                     self.open("Inputs:")
                     func_args = inspect.signature(func).bind(*args, **kwargs).arguments
-                    if (len(func_args) > 1):
+                    if len(func_args) > 1:
                         for i, item in enumerate(func_args.items()):
-                            self.comment('{} = {!r}'.format(*item))
+                            self.comment("{} = {!r}".format(*item))
                     else:
                         self.comment("None")
                     self.close()
 
                 # Run method
-                if (dump_args or dump_returns):
-                    self.open('Running...')
+                if dump_args or dump_returns:
+                    self.open("Running...")
                 r = func(*args, **kwargs)
-                if (dump_args or dump_returns):
-                    self.close('Done.', time_elapsed=time_elapsed)
+                if dump_args or dump_returns:
+                    self.close("Done.", time_elapsed=time_elapsed)
                     # Can't just change time_elapsed useing 'nonlocal' in Python 2, so we do things this way
                     elapsed_printed = True
 
                 # Report returns
-                if (dump_returns and r is not None):
-                    if (len(r) > 1):
+                if dump_returns and r is not None:
+                    if len(r) > 1:
                         for i, r_i in enumerate(r):
                             self.comment("Return[%d]: %s" % (i, r_i))
                     else:
@@ -213,16 +218,23 @@ class log_stream(object):
 
                 # We don't need to display time elapsed twice ...
                 if elapsed_printed:
-                    self.close('Done.')
+                    self.close("Done.")
                 else:
-                    self.close('Done.', time_elapsed=time_elapsed)
+                    self.close("Done.", time_elapsed=time_elapsed)
                 return r
 
             return update_wrapper(wrapper, func)
 
         return decorated_callable
 
-    def test(self, msg=None, dump_args=False, dump_returns=False, time_elapsed=False, default_verbosity='unset'):
+    def test(
+        self,
+        msg=None,
+        dump_args=False,
+        dump_returns=False,
+        time_elapsed=False,
+        default_verbosity="unset",
+    ):
         """Decorator to add in-bound and out-bound logging to a test.
 
         :param msg: string describing in-bound logging message
@@ -234,10 +246,21 @@ class log_stream(object):
         """
         self.__init__(fp_out=sys.stdout)
         self.blankline()
-        return self.callable(msg=msg, dump_args=dump_args, dump_returns=dump_returns, time_elapsed=time_elapsed,
-                             default_verbosity=default_verbosity)
+        return self.callable(
+            msg=msg,
+            dump_args=dump_args,
+            dump_returns=dump_returns,
+            time_elapsed=time_elapsed,
+            default_verbosity=default_verbosity,
+        )
 
-    def methods(self, dump_args=True, dump_returns=True, time_elapsed=True, default_verbosity='unset'):
+    def methods(
+        self,
+        dump_args=True,
+        dump_returns=True,
+        time_elapsed=True,
+        default_verbosity="unset",
+    ):
         """Decorator for automating the logging of all method calls of a class.
 
         :param dump_args: log calling arguments if True
@@ -276,7 +299,8 @@ class log_stream(object):
                             dump_args=dump_args,
                             dump_returns=dump_returns,
                             time_elapsed=time_elapsed,
-                            default_verbosity=default_verbosity)(x)
+                            default_verbosity=default_verbosity,
+                        )(x)
                     else:
                         return x
 
@@ -291,7 +315,7 @@ class log_stream(object):
         :param fp_out: File pointer
         :return: None
         """
-        if(fp_out is None):
+        if fp_out is None:
             self.fp = sys.stderr
         else:
             self.fp = fp_out
@@ -311,14 +335,16 @@ class log_stream(object):
         """
 
         # Check validity of the given verbosity
-        if not type(verbosity) in (bool, int):
+        if type(verbosity) not in (bool, int):
             self.error(
                 TypeError(
-                    "Invalid datatype {%s} being added to log stream's verbosity state." %
-                    (type(verbosity))))
+                    "Invalid datatype {%s} being added to log stream's verbosity state."
+                    % (type(verbosity))
+                )
+            )
 
         if not isinstance(verbosity, bool):
-            verbosity += (self._n_indent() - 1)
+            verbosity += self._n_indent() - 1
 
         # Add a state to the stack
         self.verbosity.append(verbosity)
@@ -329,7 +355,7 @@ class log_stream(object):
 
         :return: None
         """
-        if(len(self.verbosity) > 0):
+        if len(self.verbosity) > 0:
             self.verbosity.pop()
 
     def verbosity_level(self, verbosity):
@@ -343,20 +369,22 @@ class log_stream(object):
         result = self.n_indent_max
 
         # If state is a bool and evaluates to false, return -1 (i.e. a value always > self._n_indent()
-        if (isinstance(verbosity, bool)):
-            if(not verbosity):
+        if isinstance(verbosity, bool):
+            if not verbosity:
                 result = -1
 
         # ... else, if it's an integer, return it or n_indent_max
-        elif (isinstance(verbosity, int)):
+        elif isinstance(verbosity, int):
             result = min([verbosity, self.n_indent_max])
 
         # ... else, unsupported data type ... throw an error
         else:
             self.error(
                 Exception(
-                    "Can not interpret verbosity level of a verbosity state with unsupported type {%s}." %
-                    (type(verbosity))))
+                    "Can not interpret verbosity level of a verbosity state with unsupported type {%s}."
+                    % (type(verbosity))
+                )
+            )
 
         return result
 
@@ -366,7 +394,7 @@ class log_stream(object):
         :return: A boolean indicating if rendering is active on the stream
         """
         # If the verbosity stack is empty, use the default
-        if(len(self.verbosity) < 1):
+        if len(self.verbosity) < 1:
             max_active_level = self.verbosity_level(self.verbosity_default)
         else:
             max_active_level = self.n_indent_max
@@ -383,23 +411,29 @@ class log_stream(object):
         """
 
         def decorated_callable(func):
-            if default == 'unset':
+            if default == "unset":
                 return func
             else:
+
                 @wraps(func)
                 def wrapper(*args, **kwargs):
                     # Fetch callable's verbosity; emit a TypeError if not present
-                    if 'verbosity' not in kwargs:
+                    if "verbosity" not in kwargs:
                         verbosity = default
                     else:
                         # Check the signature to make sure that we aren't passing
                         # verbosity to a function that does not declare it and
                         # does not support kwargs
-                        func_args, func_varargs, func_keywords, func_defaults = inspect.getargspec(func)
-                        if 'verbosity' not in func_args and not func_keywords:
-                            verbosity = kwargs.pop('verbosity')
+                        (
+                            func_args,
+                            func_varargs,
+                            func_keywords,
+                            func_defaults,
+                        ) = inspect.getargspec(func)
+                        if "verbosity" not in func_args and not func_keywords:
+                            verbosity = kwargs.pop("verbosity")
                         else:
-                            verbosity = kwargs.get('verbosity')
+                            verbosity = kwargs.get("verbosity")
 
                     # Set callable's verbosity
                     self.set_verbosity(verbosity)
@@ -416,7 +450,14 @@ class log_stream(object):
 
         return decorated_callable
 
-    def comment(self, msg, unhang=True, overwrite=False, blankline_before=False, blankline_after=False):
+    def comment(
+        self,
+        msg,
+        unhang=True,
+        overwrite=False,
+        blankline_before=False,
+        blankline_after=False,
+    ):
         """Add a one-line comment to the log.
 
         :param msg: An object with a __str__ method, or a list thereof
@@ -424,10 +465,10 @@ class log_stream(object):
         :param overwrite:
         :return: None
         """
-        if(blankline_before):
+        if blankline_before:
             self.blankline()
         self._print(msg, unhang=unhang, indent=True, overwrite=overwrite)
-        if(blankline_after):
+        if blankline_after:
             self.blankline()
 
     def append(self, msg):
@@ -452,7 +493,7 @@ class log_stream(object):
         width = 30
         msg_len_last = 0
         start_time = time.time()
-        self.comment("[%s] Remaining:" % (' ' * width), unhang=True)
+        self.comment("[%s] Remaining:" % (" " * width), unhang=True)
 
         # Iterate
         for iteration, result in enumerate(gen(*args, **kwargs)):
@@ -461,23 +502,29 @@ class log_stream(object):
             secs_elapsed = time.time() - start_time
             secs_estimate = int(secs_elapsed / fraction_complete)
             secs_remaining = secs_estimate - secs_elapsed
-            if(secs_remaining > 0):
-                msg = "[%s%s] Remaining: %s" % ('#' * ticks, ' ' * (width - ticks),
-                                                str(datetime.timedelta(seconds=secs_remaining)).split('.')[0])
+            if secs_remaining > 0:
+                msg = "[%s%s] Remaining: %s" % (
+                    "#" * ticks,
+                    " " * (width - ticks),
+                    str(datetime.timedelta(seconds=secs_remaining)).split(".")[0],
+                )
                 msg_len = len(msg)
 
                 # Make sure to blank-out any old underlying text
-                if(msg_len < msg_len_last):
-                    msg += ' ' * (msg_len_last - msg_len)
+                if msg_len < msg_len_last:
+                    msg += " " * (msg_len_last - msg_len)
                 msg_len_last = msg_len
                 self.comment(msg, unhang=False, overwrite=True)
 
         # Finalize counter
-        msg = "[%s%s] Time elapsed: %s" % ('#' * ticks, ' ' * (width - ticks),
-                                           str(datetime.timedelta(seconds=secs_elapsed)).split('.')[0])
+        msg = "[%s%s] Time elapsed: %s" % (
+            "#" * ticks,
+            " " * (width - ticks),
+            str(datetime.timedelta(seconds=secs_elapsed)).split(".")[0],
+        )
         msg_len = len(msg)
-        if(msg_len < msg_len_last):
-            msg += ' ' * (msg_len_last - msg_len)
+        if msg_len < msg_len_last:
+            msg += " " * (msg_len_last - msg_len)
         self.comment(msg, unhang=False, overwrite=True)
 
     def error(self, error):
@@ -487,8 +534,9 @@ class log_stream(object):
         :param code: Optional error code to report
         :return: None
         """
-        self.comment('ERROR: ' + str(error), unhang=True, overwrite=True)
+        self.comment("ERROR: " + str(error), unhang=True, overwrite=True)
         import traceback
+
         self.comment(traceback.format_exc())
         raise error
 
@@ -497,7 +545,7 @@ class log_stream(object):
 
         :return: None
         """
-        self.comment('\n', unhang=True)
+        self.comment("\n", unhang=True)
 
     def raw(self, msg):
         """Print raw, unformatted text to the log.
@@ -520,23 +568,35 @@ class log_stream(object):
         """
         n_splice = 40
         n_lead_min = 10
-        lead_char = '='
-        msg = ' ' + splice_msg + ' - '
-        if (flag_start):
-            msg += 'start '
+        lead_char = "="
+        msg = " " + splice_msg + " - "
+        if flag_start:
+            msg += "start "
         else:
-            msg += 'end '
+            msg += "end "
         n_msg = len(msg)
         n_lead = int((n_splice - len(msg)) / 2)
-        if (n_lead <= 0):
+        if n_lead <= 0:
             n_splice = n_msg + 2 * n_lead_min
             n_lead = n_lead_min
             n_tail = n_lead_min
         else:
             n_tail = n_splice - n_msg - n_lead
-        self._print(n_lead * lead_char + msg + n_tail * lead_char + '\n', unhang=True, indent=False)
+        self._print(
+            n_lead * lead_char + msg + n_tail * lead_char + "\n",
+            unhang=True,
+            indent=False,
+        )
 
-    def _print(self, msg, unhang=True, indent=True, overwrite=False, iterables_allowed=True, **kwargs):
+    def _print(
+        self,
+        msg,
+        unhang=True,
+        indent=True,
+        overwrite=False,
+        iterables_allowed=True,
+        **kwargs
+    ):
         """This method is the main driver of output to the stream, but should
         be accessed through other methods.
 
@@ -548,19 +608,24 @@ class log_stream(object):
         :return: None
         """
         # Check if rendering is active on the stream
-        if(self.check_verbosity()):
+        if self.check_verbosity():
 
             # Optionally unhang the stream
-            if(unhang):
+            if unhang:
                 self._unhang()
 
             # This will fail for strings but pass for lists, etc.
-            # print("X:",type(msg),type(str(msg)),_internal.is_nonstring_iterable(msg),hasattr(msg, '__iter__'),isinstance(msg, _internal.string_types),msg)
-            if(_internal.is_nonstring_iterable(msg)):
-                if(overwrite):
-                    self.error(Exception("Log stream overwriting not permitted for iterables."))
-                if(not iterables_allowed):
-                    self.error(Exception("An iterable was passed to a log stream method which does not accept them."))
+            if is_nonstring_iterable(msg):
+                if overwrite:
+                    self.error(
+                        Exception("Log stream overwriting not permitted for iterables.")
+                    )
+                if not iterables_allowed:
+                    self.error(
+                        Exception(
+                            "An iterable was passed to a log stream method which does not accept them."
+                        )
+                    )
                 for line in msg:
                     self._print(line, indent=indent, overwrite=overwrite, **kwargs)
             # ... render a non-iterable object ...
@@ -569,18 +634,23 @@ class log_stream(object):
                 # and recall this method with the result to treat it as an iterable
                 str_msg = str(msg)
                 msg_split = str_msg.splitlines(True)
-                if(len(msg_split) > 1):
-                    self._print(msg_split, indent=indent, overwrite=overwrite,
-                                iterables_allowed=iterables_allowed, **kwargs)
+                if len(msg_split) > 1:
+                    self._print(
+                        msg_split,
+                        indent=indent,
+                        overwrite=overwrite,
+                        iterables_allowed=iterables_allowed,
+                        **kwargs
+                    )
                 # ... else, render a single line
                 else:
-                    if(not self.hanging and len(str_msg) > 0):
+                    if not self.hanging and len(str_msg) > 0:
                         self.n_lines[-1] += 1
-                    if(overwrite or (not self.hanging and indent)):
+                    if overwrite or (not self.hanging and indent):
                         self._indent(overwrite=overwrite)
-                    print(str_msg, end='', file=self.fp, **kwargs)
+                    print(str_msg, end="", file=self.fp, **kwargs)
                     self.fp.flush()
-                    if(str_msg.endswith('\n')):
+                    if str_msg.endswith("\n"):
                         self.hanging = False
                     else:
                         self.hanging = True
@@ -590,8 +660,8 @@ class log_stream(object):
 
         :return: None
         """
-        if(self.hanging):
-            print('', file=self.fp)
+        if self.hanging:
+            print("", file=self.fp)
             self.n_lines[-1] += 1
             self.hanging = False
 
@@ -602,9 +672,9 @@ class log_stream(object):
         :param overwrite: Boolean flag indicating whether to overwrite the current line
         :return: None
         """
-        if(overwrite):
-            print('\r', end='', file=self.fp)
-        print(self.indent_size * self._n_indent() * ' ', end='', file=self.fp)
+        if overwrite:
+            print("\r", end="", file=self.fp)
+        print(self.indent_size * self._n_indent() * " ", end="", file=self.fp)
 
     def _n_indent(self):
         """Return the current indent level of the stream.

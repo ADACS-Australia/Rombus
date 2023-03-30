@@ -14,6 +14,7 @@ import rombus._core.mpi as mpi
 import rombus._core.hdf5 as hdf5
 import rombus.exceptions as exceptions
 from rombus.params import Params
+from rombus._core.log import log
 from typing import NamedTuple
 
 # Need to put Samples in quotes below and check TYPE_CHECKING here to
@@ -338,6 +339,7 @@ RombusModelType = RombusModel | str
 #     https://github.com/encode/uvicorn (commit: d613cbea388bafafb6f642077c035ed137deea61)
 # Copyright © 2017-present, [Encode OSS Ltd](https://www.encode.io/).
 # All rights reserved.
+@log.callable("Importing model...")
 def _import_from_string(import_str: str) -> Any:
 
     """Import a RombusModel class from a given string of the form 'python.module.name:ClassName'.
@@ -357,6 +359,8 @@ def _import_from_string(import_str: str) -> Any:
     Any
         An instance of the user-defined model class
     """
+
+    log.append(f"(model={import_str})...")
 
     if not isinstance(import_str, str):
         raise exceptions.RombusModelImportFromStringError(
