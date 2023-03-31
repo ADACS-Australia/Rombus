@@ -1,3 +1,4 @@
+import sys
 import traceback
 
 ERROR_ROMBUS_INTERNAL_EXCEPTION = 101
@@ -7,15 +8,14 @@ ERROR_ROMBUS_EXTERNAL_EXCEPTION = 102
 def handle_exception(
     exception: Exception, code: int = ERROR_ROMBUS_EXTERNAL_EXCEPTION
 ) -> None:
+    print("\n")
     if code == ERROR_ROMBUS_INTERNAL_EXCEPTION:
         print("A Rombus exception was encountered:")
     else:
         print("A non-Rombus exception was encountered:")
-    print(f"  type: {type(exception).__name__}")
-    print(f"  message:\n{exception}")
-    print("\n")
+    print()
     traceback.print_exception(exception)
-    # sys.exit(code)
+    sys.exit(code)
 
 
 class RombusException(Exception):

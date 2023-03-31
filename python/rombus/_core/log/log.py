@@ -1,4 +1,4 @@
-"""This module provides a `log_stream` class for generating logging
+"""This module provides a `LogStream` class for generating logging
 information.  It is intended for the generation of course-grained reporting of
 program execution for the user and should not be used in performance-critical
 situations, in tight loops, etc.
@@ -11,6 +11,8 @@ respectively.
 # For legacy-Python compatibility
 from __future__ import print_function
 from functools import update_wrapper
+
+from typing import Self
 
 import sys
 import time
@@ -72,11 +74,17 @@ def format_time(seconds, granularity=None):
     return result
 
 
-class log_stream(object):
+class LogStream(object):
     """This class provides a file pointer for logging user feedback and methods
     for writing to it."""
 
-    def __init__(self, fp_out=None, verbosity=True, n_indent_max=10):
+    def __init__(
+        self,
+        fp_out=None,
+        verbosity=True,
+        n_indent_max=10,
+        exception_handler=lambda e: None,
+    ):
         """
         :param fp_out: An optional file pointer to use for the log.
         :param verbosity: An optional parameter that sets the default verbosity of the stream.
@@ -90,6 +98,8 @@ class log_stream(object):
 
         # Set the maximum number of indent levels to render
         self.n_indent_max = n_indent_max
+
+        self._exception_handler = exception_handler
 
         # These lists will have one entry per indent-level
         self.t_last = [time.time()]
@@ -111,7 +121,7 @@ class log_stream(object):
         :param msg: An object with a __str__ method, or a list thereof
         :return: None
         """
-        self._print(msg, unhang=True, indent=True)
+        self._print(msg + "...", unhang=True, indent=True)
         self.t_last.append(time.time())
         self.n_lines.append(0)
         self.splice.append(splice)
@@ -227,6 +237,26 @@ class log_stream(object):
 
         return decorated_callable
 
+    class _Context:
+        def __init__(self, stream: Self, *args, **kwargs):
+            self.stream = stream
+            self.args = args
+            self.kwargs = kwargs
+            self._exception_handler = stream._exception_handler
+
+        def __enter__(self):
+            self.stream.open(*self.args, **self.kwargs)
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            if exc_type is not None:
+                self._exception_handler(exc_val)
+            else:
+                self.stream.close("Done")
+            return True
+
+    def context(self, *args, **kwargs):
+        return LogStream._Context(self, *args, **kwargs)
+
     def test(
         self,
         msg=None,
@@ -326,8 +356,8 @@ class log_stream(object):
 
         This method takes either a boolean flag indicating whether logging is active, or an integer indicating
         the maximum indenting level that will be rendered.  It can be removed using the
-        :py:meth:`~.log.log_stream.unset_verbosity` method.  See the
-        :py:meth:`~.log.log_stream.check_verbosity` method for an account of how the verbosity passed to this
+        :py:meth:`~.log.LogStream.unset_verbosity` method.  See the
+        :py:meth:`~.log.LogStream.check_verbosity` method for an account of how the verbosity passed to this
         method is interpreted.
 
         :param verbosity: A boolean flag indicating if logging is active, or an integer indicating the verbosity level

@@ -133,6 +133,7 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         pass
 
     @classmethod
+    @log.callable("Instantiating model from file")
     def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
         """Generate a RombusModel instance from a Rombus HDF5 file.
 
@@ -299,6 +300,7 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         return timeit.default_timer() - start_time
 
     @classmethod
+    @log.callable("Writing project template")
     def write_project_template(cls, project_name: str) -> None:
         """Write a project model to the current working directory to start a new project from.
 
@@ -326,11 +328,11 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         samples_file_out = os.path.join(os.getcwd(), f"{project_name}_samples.csv")
 
         # Copy files
-        try:
+        with log.context("Writing files"):
             shutil.copy(model_file_source, model_file_out)
+            log.comment(f"Written: {os.path.split(model_file_out)[1]}")
             shutil.copy(samples_file_source, samples_file_out)
-        except IOError as e:
-            exceptions.handle_exception(e)
+            log.comment(f"Written: {os.path.split(samples_file_out)[1]}")
 
 
 RombusModelType = RombusModel | str
@@ -339,7 +341,7 @@ RombusModelType = RombusModel | str
 #     https://github.com/encode/uvicorn (commit: d613cbea388bafafb6f642077c035ed137deea61)
 # Copyright © 2017-present, [Encode OSS Ltd](https://www.encode.io/).
 # All rights reserved.
-@log.callable("Importing model...")
+@log.callable("Importing model")
 def _import_from_string(import_str: str) -> Any:
 
     """Import a RombusModel class from a given string of the form 'python.module.name:ClassName'.
