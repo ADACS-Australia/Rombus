@@ -2,6 +2,7 @@ from typing import Callable, List, NamedTuple, Optional
 
 import numpy as np
 import rombus.exceptions as exceptions
+from rombus._core.log import log
 
 MAX_N_TRIES = 1000
 
@@ -88,7 +89,7 @@ class Params(object):
                             f"Max number of tries ({MAX_N_TRIES}) reached when trying to generate a valid random parameter set"
                         )
         except exceptions.RombusException as e:
-            exceptions.handle_exception(e)
+            log.handle_exception(e)
         return new_sample
 
     def np2param(self, params_np: np.ndarray) -> NamedTuple:

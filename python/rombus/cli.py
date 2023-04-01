@@ -5,11 +5,11 @@ import click
 import collections
 
 import rombus.plots as plots
-import rombus.exceptions as exceptions
 
 from rombus.model import RombusModel
 from rombus.samples import Samples
 from rombus.rom import ReducedOrderModel
+from rombus._core.log import log
 from typing import Tuple
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
@@ -53,10 +53,8 @@ def cli(ctx: click.core.Context) -> None:
 def quickstart(project_name: str) -> None:
     """Write a project template to kickstart the creation of a new project."""
 
-    try:
+    with log.context("Creating new project from template"):
         RombusModel.write_project_template(project_name)
-    except exceptions.RombusException as e:
-        e.handle_exception()
 
 
 @cli.command(context_settings=CONTEXT_SETTINGS)
@@ -86,16 +84,16 @@ def build(
 ) -> None:
     """Build a Reduced Order Model."""
 
-    # Load model
-    try:
+    with log.context("Building ROM"):
+        log.comment(f"Model:   {model}")
+        log.comment(f"Samples: {filename_samples}")
+
+        # Load model
         model_loaded = RombusModel.load(model)
-    except exceptions.RombusException as e:
-        e.handle_exception()
 
-    # Load samples
-    samples = Samples(model_loaded, filename=filename_samples)
+        # Load samples
+        samples = Samples(model_loaded, filename=filename_samples)
 
-    try:
         # Build ROM
         assert do_step is None or type(do_step) == str  # keeping mypy happy
         ROM = ReducedOrderModel(model_loaded, samples).build(do_step=do_step)
@@ -105,11 +103,7 @@ def build(
             filename_out = f"{model_loaded.model_basename}.hdf5"
         else:
             filename_out = out
-            ROM.write(filename_out)
-    except exceptions.RombusException as e:
-        e.handle_exception()
-    except AssertionError as e:
-        exceptions.handle_exception(e)
+        ROM.write(filename_out)
 
 
 @cli.command(context_settings=CONTEXT_SETTINGS)
@@ -118,7 +112,8 @@ def build(
 def refine(ctx: click.core.Context, filename_rom: str) -> None:
     """Refine parameter sampling to improve an established reduced order model."""
 
-    try:
+    with log.context(f"Refining ROM ({filename_rom})"):
+
         # Build model and refine it
         ROM = ReducedOrderModel.from_file(filename_rom).refine()
 
@@ -126,8 +121,6 @@ def refine(ctx: click.core.Context, filename_rom: str) -> None:
         filename_split = filename_rom.rsplit(".", 1)
         filename_out = f"{filename_split[0]}_refined.{filename_split[1]}"
         ROM.write(filename_out)
-    except exceptions.RombusException as e:
-        e.handle_exception()
 
 
 @cli.command(context_settings=FLEX_CONTEXT_SETTINGS)
@@ -142,7 +135,8 @@ def evaluate(
     PARAMETERS is a list of parameter values of the form A=VAL B=VAL ...
     """
 
-    try:
+    with log.context("Evaluating ROM"):
+
         # Read ROM
         ROM = ReducedOrderModel.from_file(filename_rom)
 
@@ -151,9 +145,6 @@ def evaluate(
 
         # Generate plot
         plots.compare_rom_to_true(ROM, model_params)
-
-    except exceptions.RombusException as e:
-        e.handle_exception()
 
 
 @cli.command(context_settings=FLEX_CONTEXT_SETTINGS)
@@ -169,7 +160,7 @@ def evaluate(
 def timing(ctx: click.core.Context, filename_rom: str, n_samples: int) -> None:
     """Compute timing information for a ROM and it's source model."""
 
-    try:
+    with log.context(f"Creating timing information for ROM {filename_rom}"):
         # Read ROM
         ROM = ReducedOrderModel.from_file(filename_rom)
 
@@ -181,20 +172,22 @@ def timing(ctx: click.core.Context, filename_rom: str, n_samples: int) -> None:
 
         # Generate timing information for ROM
         timing_ROM = ROM.timing(timing_sample)
-    except exceptions.RombusException as e:
-        e.handle_exception()
 
     # Report results
-    print(
+    log.comment(
         f"Timing information for ROM:   {timing_ROM:.2e}s for {n_samples} calls ({timing_ROM/n_samples:.2e} per sample)."
     )
-    print(
+    log.comment(
         f"Timing information for model: {timing_model:.2e}s for {n_samples} calls ({timing_model/n_samples:.2e} per sample)."
     )
     if timing_ROM > timing_model:
-        print(f"ROM is {timing_ROM/timing_model:.2f}X slower than the source model.")
+        log.comment(
+            f"ROM is {timing_ROM/timing_model:.2f}X slower than the source model."
+        )
     else:
-        print(f"ROM is {timing_model/timing_ROM:.2f}X faster than the source model.")
+        log.comment(
+            f"ROM is {timing_model/timing_ROM:.2f}X faster than the source model."
+        )
 
 
 if __name__ == "__main__":

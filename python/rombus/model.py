@@ -6,11 +6,9 @@ import timeit
 from abc import ABCMeta, abstractmethod
 from collections import Counter
 from typing import Any, Dict, Self, Tuple, TYPE_CHECKING
-from tqdm.auto import tqdm  # type: ignore
 
 import numpy as np
 
-import rombus._core.mpi as mpi
 import rombus._core.hdf5 as hdf5
 import rombus.exceptions as exceptions
 from rombus.params import Params
@@ -154,10 +152,11 @@ class RombusModel(metaclass=_RombusModelABCMeta):
             if close_file:
                 h5file.close()
         except IOError as e:
-            exceptions.handle_exception(e)
+            log.handle_exception(e)
         return cls.load(model_str)
 
     @classmethod
+    @log.callable("Loading model from file")
     def load(cls, model: str | Self) -> Self:
 
         """Ensure that a model has been imported for use by Rombus.
@@ -177,7 +176,7 @@ class RombusModel(metaclass=_RombusModelABCMeta):
             try:
                 model_class = _import_from_string(model)
             except exceptions.RombusException as e:
-                exceptions.handle_exception(e)
+                log.handle_exception(e)
             else:
                 return model_class(model)
         elif not isinstance(model, RombusModel):
@@ -186,6 +185,7 @@ class RombusModel(metaclass=_RombusModelABCMeta):
             )
         return model  # type: ignore
 
+    @log.callable("Writing model to file")
     def write(self, h5file: hdf5.File) -> None:
         """Write a RombusModel to a Rombus HDF5 file.
 
@@ -199,7 +199,7 @@ class RombusModel(metaclass=_RombusModelABCMeta):
             h5_group = h5file.create_group("model")
             h5_group.create_dataset("model_str", data=self.model_str)
         except IOError as e:
-            exceptions.handle_exception(e)
+            log.handle_exception(e)
 
     # Need to put Samples in quotes and check TYPE_CHECKING above to manage circular import with models.py
     def generate_model_set(self, samples: "Samples") -> np.ndarray:
@@ -219,11 +219,10 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         my_ts: np.ndarray = np.zeros(
             shape=(samples.n_samples, self.n_domain), dtype=self.model_dtype
         )
-        for i, params_numpy in enumerate(
-            tqdm(samples.samples, desc=f"Generating training set for rank {mpi.RANK}")
-        ):
-            model_i = self.compute(self.params.np2param(params_numpy), self.domain)
-            my_ts[i] = model_i / np.sqrt(np.vdot(model_i, model_i))
+        with log.context("Generating training set"):
+            for i, params_numpy in enumerate(samples.samples):
+                model_i = self.compute(self.params.np2param(params_numpy), self.domain)
+                my_ts[i] = model_i / np.sqrt(np.vdot(model_i, model_i))
 
         return my_ts
 
@@ -293,10 +292,14 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         float
             Seconds elapsed
         """
-        start_time = timeit.default_timer()
-        for i, sample in enumerate(samples.samples):
-            params_numpy = self.params.np2param(sample)
-            _ = self.compute(params_numpy, self.domain)
+
+        with log.context(
+            f"Computing timing information for model using {samples.n_samples} samples"
+        ):
+            start_time = timeit.default_timer()
+            for i, sample in enumerate(samples.samples):
+                params_numpy = self.params.np2param(sample)
+                _ = self.compute(params_numpy, self.domain)
         return timeit.default_timer() - start_time
 
     @classmethod
@@ -362,7 +365,7 @@ def _import_from_string(import_str: str) -> Any:
         An instance of the user-defined model class
     """
 
-    log.append(f"(model={import_str})...")
+    log.append(f"({import_str})...")
 
     if not isinstance(import_str, str):
         raise exceptions.RombusModelImportFromStringError(

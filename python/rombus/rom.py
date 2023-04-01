@@ -10,6 +10,7 @@ from typing import Optional, Self, NamedTuple
 import rombus._core.mpi as mpi
 import rombus._core.hdf5 as hdf5
 import rombus.exceptions as exceptions
+from rombus._core.log import log
 from rombus.model import RombusModel, RombusModelType
 from rombus.samples import Samples
 from rombus.ei import EmpiricalInterpolant
@@ -44,6 +45,7 @@ class ReducedOrderModel(object):
         """EmpiricalInterpolant generated for the ROM"""
 
     @classmethod
+    @log.callable("Instantiating ROM from file")
     def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
         """Instantiate a ROM from a Rombus HDF5 file.
 
@@ -77,6 +79,7 @@ class ReducedOrderModel(object):
             empirical_interpolant=empirical_interpolant,
         )
 
+    @log.callable("Building ROM")
     def build(
         self, do_step: Optional[str] = None, tol: float = DEFAULT_TOLERANCE
     ) -> Self:
@@ -134,6 +137,7 @@ class ReducedOrderModel(object):
         _signal_at_nodes = self.model.compute(params, self.empirical_interpolant.nodes)
         return np.dot(_signal_at_nodes, np.real(self.empirical_interpolant.B_matrix))
 
+    @log.callable("Refining ROM")
     def refine(
         self,
         n_random: int = DEFAULT_REFINE_N_RANDOM,
@@ -175,7 +179,9 @@ class ReducedOrderModel(object):
         filename : str
             Filename of the output file
         """
-        with h5py.File(filename, "w") as h5file:
+        with log.context(f"Writing ROM to file ({filename})"), h5py.File(
+            filename, "w"
+        ) as h5file:
             self.model.write(h5file)
             self.samples.write(h5file)
             if self.reduced_basis is not None:
@@ -199,10 +205,13 @@ class ReducedOrderModel(object):
             Seconds elapsed
         """
 
-        start_time = timeit.default_timer()
-        for i, sample in enumerate(samples.samples):
-            params_numpy = self.model.params.np2param(sample)
-            _ = self.evaluate(params_numpy)
+        with log.context(
+            f"Computing timing information for ROM using {samples.n_samples} samples"
+        ):
+            start_time = timeit.default_timer()
+            for i, sample in enumerate(samples.samples):
+                params_numpy = self.model.params.np2param(sample)
+                _ = self.evaluate(params_numpy)
         return timeit.default_timer() - start_time
 
     def _validate_and_refine_basis(
@@ -225,49 +234,56 @@ class ReducedOrderModel(object):
                 self.model, self.samples, tol=tol
             )
 
-        n_selected_greedy_points_global = np.iinfo(np.int32).max
-        n_greedy_last = len(self.reduced_basis.greedypoints)
-        n_greedy_last_global = mpi.COMM.allreduce(n_greedy_last, op=mpi4py.MPI.SUM)
-        while True:
-            # generate validation set by randomly sampling the parameter space
-            new_samples = Samples(self.model, n_random=n_random)
-            my_vs = self.model.generate_model_set(new_samples)
+        if self.reduced_basis is None:
+            raise exceptions.ReducedBasisNotComputedError(
+                "A ROM's reduced basis uncomputed when trying to refine basis"
+            )
+        else:
+            n_selected_greedy_points_global = np.iinfo(np.int32).max
+            n_greedy_last = len(self.reduced_basis.greedypoints)
+            n_greedy_last_global = mpi.COMM.allreduce(n_greedy_last, op=mpi4py.MPI.SUM)
+            while True:
+                # generate validation set by randomly sampling the parameter space
+                new_samples = Samples(self.model, n_random=n_random)
+                my_vs = self.model.generate_model_set(new_samples)
 
-            # test validation set
-            RB_transpose = np.transpose(self.reduced_basis.matrix)
-            selected_greedy_points = []
-            for i, validation_sample in enumerate(new_samples.samples):
-                if self.model.model_dtype == complex:
-                    proj_error = 1 - np.sum(
-                        [
-                            np.real(np.conjugate(d_i) * d_i)
-                            for d_i in np.dot(my_vs[i], RB_transpose)
-                        ]
-                    )
+                # test validation set
+                RB_transpose = np.transpose(self.reduced_basis.matrix)
+                selected_greedy_points = []
+                for i, validation_sample in enumerate(new_samples.samples):
+                    if self.model.model_dtype == complex:
+                        proj_error = 1 - np.sum(
+                            [
+                                np.real(np.conjugate(d_i) * d_i)
+                                for d_i in np.dot(my_vs[i], RB_transpose)
+                            ]
+                        )
+                    else:
+                        proj_error = 1 - np.sum(np.dot(my_vs[i], RB_transpose) ** 2)
+                    if proj_error > tol:
+                        selected_greedy_points.append(validation_sample)
+                n_selected_greedy_points_global = mpi.COMM.allreduce(
+                    len(selected_greedy_points), op=mpi4py.MPI.SUM
+                )
+                log.comment(
+                    f"Number of samples added: {n_selected_greedy_points_global}"
+                )
+
+                # add the inaccurate points to the original selected greedy
+                # points and remake the basis
+                self.samples.extend(selected_greedy_points)
+                self.reduced_basis = ReducedBasis().compute(
+                    self.model, self.samples, tol=tol
+                )
+                n_greedy_new = len(self.reduced_basis.greedypoints)
+                n_greedy_new_global = mpi.COMM.allreduce(
+                    n_greedy_new, op=mpi4py.MPI.SUM
+                )
+
+                if not iterate or n_greedy_new_global == n_greedy_last_global:
+                    break
                 else:
-                    proj_error = 1 - np.sum(np.dot(my_vs[i], RB_transpose) ** 2)
-                if proj_error > tol:
-                    selected_greedy_points.append(validation_sample)
-            n_selected_greedy_points_global = mpi.COMM.allreduce(
-                len(selected_greedy_points), op=mpi4py.MPI.SUM
-            )
-            if mpi.RANK_IS_MAIN:
-                print(f"Number of samples added: {n_selected_greedy_points_global}")
-
-            # add the inaccurate points to the original selected greedy
-            # points and remake the basis
-            self.samples.extend(selected_greedy_points)
-            self.reduced_basis = ReducedBasis().compute(
-                self.model, self.samples, tol=tol
-            )
-            n_greedy_new = len(self.reduced_basis.greedypoints)
-            n_greedy_new_global = mpi.COMM.allreduce(n_greedy_new, op=mpi4py.MPI.SUM)
-
-            if not iterate or n_greedy_new_global == n_greedy_last_global:
-                break
-            else:
-                if mpi.RANK_IS_MAIN:
-                    print(
+                    log.comment(
                         f"Current number of accepted greedy points: {n_greedy_new_global}"
                     )
-                n_greedy_last_global = n_greedy_new_global
+                    n_greedy_last_global = n_greedy_new_global

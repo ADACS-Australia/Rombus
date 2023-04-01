@@ -11,8 +11,9 @@ respectively.
 # For legacy-Python compatibility
 from __future__ import print_function
 from functools import update_wrapper
+import traceback
 
-from typing import Self
+from typing import List
 
 import sys
 import time
@@ -83,7 +84,7 @@ class LogStream(object):
         fp_out=None,
         verbosity=True,
         n_indent_max=10,
-        exception_handler=lambda e: None,
+        exception_handler=None,
     ):
         """
         :param fp_out: An optional file pointer to use for the log.
@@ -99,7 +100,10 @@ class LogStream(object):
         # Set the maximum number of indent levels to render
         self.n_indent_max = n_indent_max
 
-        self._exception_handler = exception_handler
+        if exception_handler is None:
+            self._exception_handler = self.handle_exception
+        else:
+            self._exception_handler = exception_handler
 
         # These lists will have one entry per indent-level
         self.t_last = [time.time()]
@@ -107,13 +111,15 @@ class LogStream(object):
         self.splice = [None]
 
         # This list will be a stack with one entry per verbosity state.  Initialize with the given default.
-        self.verbosity = []
+        self.verbosity: List = []
         self.verbosity_default = verbosity
         self.set_verbosity(self.verbosity_default)
 
         # Indicates whether the last-written line
         # ended with a new line
         self.hanging = False
+
+        self._halt = False
 
     def open(self, msg, splice=None):
         """Open a new indent bracket for the log.
@@ -163,6 +169,18 @@ class LogStream(object):
                     msg_time = " (%s)" % (dt_txt)
             self._print(msg + msg_time, unhang=(n_lines > 1))
         self._unhang()
+
+    def handle_exception(self, exception: Exception) -> None:
+
+        # Make sure to unhang the logger
+        self._unhang()
+        self.blankline()
+
+        # Print exception and stack trace then exit
+        traceback.print_exception(exception)
+
+        # Halt the logger, in case we're inside nested log.contexts
+        self.halt()
 
     def callable(
         self,
@@ -238,7 +256,7 @@ class LogStream(object):
         return decorated_callable
 
     class _Context:
-        def __init__(self, stream: Self, *args, **kwargs):
+        def __init__(self, stream, *args, **kwargs):
             self.stream = stream
             self.args = args
             self.kwargs = kwargs
@@ -507,7 +525,7 @@ class LogStream(object):
         :param msg: An object with a __str__ method, or a list thereof
         :return: None
         """
-        self._print(msg, unhang=False, indent=False)
+        self._print(msg + "...", unhang=False, indent=False)
 
     def progress_bar(self, gen, count, *args, **kwargs):
         """Display a progress bar for a generator.
@@ -557,19 +575,6 @@ class LogStream(object):
             msg += " " * (msg_len_last - msg_len)
         self.comment(msg, unhang=False, overwrite=True)
 
-    def error(self, error):
-        """Raise an exception.
-
-        :param err_msg: Error message
-        :param code: Optional error code to report
-        :return: None
-        """
-        self.comment("ERROR: " + str(error), unhang=True, overwrite=True)
-        import traceback
-
-        self.comment(traceback.format_exc())
-        raise error
-
     def blankline(self):
         """Print a blank line to the stream.
 
@@ -584,6 +589,10 @@ class LogStream(object):
         :return: None
         """
         self._print(msg, unhang=True, indent=False)
+
+    def halt(self):
+        self._unhang()
+        self._halt = True
 
     def _splice_line(self, splice_msg, flag_start):
         """Create splice lines in the log for isolating sections of the stream.
@@ -617,6 +626,12 @@ class LogStream(object):
             unhang=True,
             indent=False,
         )
+
+    def _print_to_fp(self, msg, **kwargs):
+
+        if not self._halt:
+            print(msg, **kwargs)
+            self.fp.flush()
 
     def _print(
         self,
@@ -678,8 +693,7 @@ class LogStream(object):
                         self.n_lines[-1] += 1
                     if overwrite or (not self.hanging and indent):
                         self._indent(overwrite=overwrite)
-                    print(str_msg, end="", file=self.fp, **kwargs)
-                    self.fp.flush()
+                    self._print_to_fp(str_msg, end="", file=self.fp, **kwargs)
                     if str_msg.endswith("\n"):
                         self.hanging = False
                     else:
@@ -691,7 +705,7 @@ class LogStream(object):
         :return: None
         """
         if self.hanging:
-            print("", file=self.fp)
+            self._print_to_fp("")
             self.n_lines[-1] += 1
             self.hanging = False
 
@@ -703,8 +717,10 @@ class LogStream(object):
         :return: None
         """
         if overwrite:
-            print("\r", end="", file=self.fp)
-        print(self.indent_size * self._n_indent() * " ", end="", file=self.fp)
+            self._print_to_fp("\r", end="", file=self.fp)
+        self._print_to_fp(
+            self.indent_size * self._n_indent() * " ", end="", file=self.fp
+        )
 
     def _n_indent(self):
         """Return the current indent level of the stream.

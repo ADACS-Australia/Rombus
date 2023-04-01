@@ -5,9 +5,9 @@ from typing import Self
 
 from scipy.linalg.lapack import get_lapack_funcs  # type: ignore
 
-import rombus._core.mpi as mpi
 import rombus._core.hdf5 as hdf5
-import rombus.exceptions as exceptions
+
+from rombus._core.log import log
 
 from rombus.reduced_basis import ReducedBasis
 
@@ -213,20 +213,18 @@ class _StandardEIM(_EmpiricalInterpolation):
         self.seed(basis[0])
 
         # EIM algorithm with reduced complexity for inverting the van der Monde matrix
-        if verbose:
-            print("\nIter", "\t", "Indices")
         if timerQ:
             t0 = time.time()
         dim = len(basis)
         for ctr in range(dim - 1):
             if verbose:
-                print(ctr + 1, "\t", self.indices[ctr])
+                log.comment(f">>> Iter {ctr+1:003}: Indices {self.indices[ctr]}")
 
             # Single iteration
             self.iter(ctr, basis[ctr + 1])
 
         if timerQ:
-            print("\nElapsed time =", time.time() - t0)
+            log.comment("\nElapsed time =", time.time() - t0)
 
         # Compute interpolant matrix 'B'
         # if flag == 1:
@@ -270,6 +268,7 @@ class EmpiricalInterpolant(object):
         self.nodes = nodes
         """Interpolant nodes"""
 
+    @log.callable("Computing empirical interpolant")
     def compute(self, reduced_basis: ReducedBasis) -> Self:
         """Compute empirical interpolant for a given reduced basis
 
@@ -284,9 +283,6 @@ class EmpiricalInterpolant(object):
             A reference to self, to allow for chaining of method calls
         """
 
-        if mpi.RANK_IS_MAIN:
-            print("Computing empirical interpolant")
-
         eim = _StandardEIM(
             reduced_basis.matrix_shape[0],
             reduced_basis.matrix_shape[1],
@@ -300,6 +296,7 @@ class EmpiricalInterpolant(object):
 
         return self
 
+    @log.callable("Writing empirical interpolant")
     def write(self, h5file: hdf5.File) -> None:
         """Write empirical interpolant to an open HDF5 file
 
@@ -314,9 +311,10 @@ class EmpiricalInterpolant(object):
             h5_group.create_dataset("B_matrix", data=self.B_matrix)
             h5_group.create_dataset("nodes", data=self.nodes)
         except IOError as e:
-            exceptions.handle_exception(e)
+            log.handle_exception(e)
 
     @classmethod
+    @log.callable("Instantiating empirical interpolant from file")
     def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
         """Instantiate an EmpiricalInterpolant from a Rombus file.
 
@@ -338,5 +336,5 @@ class EmpiricalInterpolant(object):
             if close_file:
                 h5file.close()
         except IOError as e:
-            exceptions.handle_exception(e)
+            log.handle_exception(e)
         return cls(B_matrix=B_matrix, nodes=nodes)
