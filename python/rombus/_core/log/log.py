@@ -275,6 +275,84 @@ class LogStream(object):
     def context(self, *args, **kwargs):
         return LogStream._Context(self, *args, **kwargs)
 
+    class _Progress:
+        def __init__(self, stream, msg, target, *args, reverse=False, **kwargs):
+            self.stream = stream
+            self.msg = msg
+            self.target = target
+            self.args = args
+            self.kwargs = kwargs
+            self._exception_handler = stream._exception_handler
+            self.reverse = reverse
+
+            self.i_update = 1
+            self.n_update = 10
+            if self.reverse:
+                self.report_next = self.target * (self.n_update - 1) / self.n_update
+            else:
+                self.report_next = self.target / self.n_update
+
+        def reset_next(self, progress):
+            if self.reverse:
+                self.report_next = max(
+                    [
+                        self.target,
+                        progress
+                        - (progress - self.target) / (self.n_update - self.i_update),
+                    ]
+                )
+            else:
+                self.report_next = min(
+                    [
+                        self.target,
+                        progress
+                        + (self.target - progress) / (self.n_update - self.i_update),
+                    ]
+                )
+
+        def update(self, progress):
+            if self.i_update < self.n_update:
+                if self.reverse:
+                    if progress <= self.report_next:
+                        progress_pc = int(min([100, 100 * progress / self.target]))
+                        self.stream.comment(f"{progress_pc:2}% complete.")
+                        self.report_next = max(
+                            [
+                                self.target,
+                                progress
+                                - (progress - self.target)
+                                / (self.n_update - self.i_update),
+                            ]
+                        )
+                        self.i_update = self.i_update + 1
+                else:
+                    if progress >= self.report_next:
+                        progress_pc = int(min([100, 100 * progress / self.target]))
+                        self.stream.comment(f"{progress_pc:2}% complete.")
+                        self.report_next = min(
+                            [
+                                self.target,
+                                progress
+                                + (self.target - progress)
+                                / (self.n_update - self.i_update),
+                            ]
+                        )
+                        self.i_update = self.i_update + 1
+
+        def __enter__(self):
+            self.stream.open(self.msg, *self.args, **self.kwargs)
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            if exc_type is not None:
+                self._exception_handler(exc_val)
+            else:
+                self.stream.close("Done")
+            return True
+
+    def progress(self, *args, **kwargs):
+        return LogStream._Progress(self, *args, **kwargs)
+
     def test(
         self,
         msg=None,
@@ -640,7 +718,7 @@ class LogStream(object):
         indent=True,
         overwrite=False,
         iterables_allowed=True,
-        **kwargs
+        **kwargs,
     ):
         """This method is the main driver of output to the stream, but should
         be accessed through other methods.
@@ -685,7 +763,7 @@ class LogStream(object):
                         indent=indent,
                         overwrite=overwrite,
                         iterables_allowed=iterables_allowed,
-                        **kwargs
+                        **kwargs,
                     )
                 # ... else, render a single line
                 else:

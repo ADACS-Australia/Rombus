@@ -1,6 +1,5 @@
 import numpy as np
 
-import time
 from typing import Self
 
 from scipy.linalg.lapack import get_lapack_funcs  # type: ignore
@@ -206,32 +205,21 @@ class _StandardEIM(_EmpiricalInterpolation):
         )
         pass
 
-    def make(self, basis, verbose=True, timerQ=False):
+    def make(self, basis, verbose=True):
         """Make an empirical interpolant using the standard greedy algorithm"""
 
         # Seed the greedy algorithm
         self.seed(basis[0])
 
         # EIM algorithm with reduced complexity for inverting the van der Monde matrix
-        if timerQ:
-            t0 = time.time()
         dim = len(basis)
-        for ctr in range(dim - 1):
-            if verbose:
-                log.comment(f">>> Iter {ctr+1:003}: Indices {self.indices[ctr]}")
+        with log.progress("Iterating", dim - 1) as progress:
+            for ctr in range(dim - 1):
 
-            # Single iteration
-            self.iter(ctr, basis[ctr + 1])
+                # Single iteration
+                self.iter(ctr, basis[ctr + 1])
+                progress.update(ctr)
 
-        if timerQ:
-            log.comment("\nElapsed time =", time.time() - t0)
-
-        # Compute interpolant matrix 'B'
-        # if flag == 1:
-        #     self.size = ctr
-        # else:
-        #     self.size = ctr+2
-        # self.trim(ctr+1)
         self.trim(ctr + 2)
         self.make_interpolant()
         self.size = len(self.indices)

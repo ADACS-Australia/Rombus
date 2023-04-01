@@ -2,6 +2,7 @@ import numpy as np
 
 from typing import List, Self, Tuple
 
+from math import log10
 import rombus._core.mpi as mpi
 import rombus._core.hdf5 as hdf5
 import rombus.exceptions as exceptions
@@ -110,7 +111,9 @@ class ReducedBasis(object):
         # Compute the model for each given sample
         my_ts: np.ndarray = self.model.generate_model_set(samples)
 
-        with log.context("Filling basis with greedy-algorithm"):
+        with log.progress(
+            "Filling basis with greedy-algorithm", log10(tol), reverse=True
+        ) as progress:
 
             # hardcoding 1st model to be used to start the basis
             self._init_matrix(my_ts[0])
@@ -126,12 +129,8 @@ class ReducedBasis(object):
                 )
                 self.matrix_shape[0] = len(self.matrix)
                 err_rnk, err_idx, error = error_data
-
-                # log and cache some data
-
-                log.comment(
-                    f">>> Iter {iter:003}: err {error:.1E} (rank {err_rnk:002}@idx{err_idx:003})"
-                )
+                if iter == 1:
+                    progress.reset_next(error)
 
                 basis_index = self._convert_to_basis_index(
                     err_rnk, err_idx, samples.n_samples
@@ -141,6 +140,7 @@ class ReducedBasis(object):
 
                 # update iteration count
                 iter += 1
+                progress.update(log10(error))
 
         self.greedypoints = [samples.samples[i] for i in basis_indicies]
 

@@ -219,10 +219,11 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         my_ts: np.ndarray = np.zeros(
             shape=(samples.n_samples, self.n_domain), dtype=self.model_dtype
         )
-        with log.context("Generating training set"):
+        with log.progress("Generating training set", samples.n_samples) as progress:
             for i, params_numpy in enumerate(samples.samples):
                 model_i = self.compute(self.params.np2param(params_numpy), self.domain)
                 my_ts[i] = model_i / np.sqrt(np.vdot(model_i, model_i))
+                progress.update(i)
 
         return my_ts
 
