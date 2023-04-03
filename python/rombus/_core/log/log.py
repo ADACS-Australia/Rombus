@@ -32,6 +32,8 @@ intervals = (
 
 string_types = (str, bytes)
 
+TIMING_AUTO_SECONDS_DEFAULT = 0
+
 
 def is_nonstring_iterable(object_in):
     """Determine if an object is a non-string iterable.
@@ -51,16 +53,22 @@ def format_time(seconds, granularity=None):
     """
     result = []
 
-    for i_interval, [name, count] in enumerate(intervals):
-        value = seconds // count
-        if value:
-            seconds -= value * count
-            if name == intervals[-1][0] or i_interval == granularity:
-                result.append("%.1f %s" % (value, name))
-            else:
-                if value == 1:
-                    name = name.rstrip("s")
-                result.append("%d %s" % (value, name))
+    if seconds < 1:
+        if seconds < 1e-3:
+            result.append(f"{int(1e6*seconds)} microseconds")
+        else:
+            result.append(f"{int(1e3*seconds)} milliseconds")
+    else:
+        for i_interval, [name, count] in enumerate(intervals):
+            value = seconds // count
+            if value:
+                seconds -= value * count
+                if name == intervals[-1][0] or i_interval == granularity:
+                    result.append("%.1f %s" % (value, name))
+                else:
+                    if value == 1:
+                        name = name.rstrip("s")
+                    result.append("%d %s" % (value, name))
 
     if granularity:
         result = ", ".join(result[:granularity])
@@ -85,6 +93,7 @@ class LogStream(object):
         verbosity=True,
         n_indent_max=10,
         exception_handler=None,
+        time_elapsed_auto_seconds=TIMING_AUTO_SECONDS_DEFAULT,
     ):
         """
         :param fp_out: An optional file pointer to use for the log.
@@ -105,10 +114,13 @@ class LogStream(object):
         else:
             self._exception_handler = exception_handler
 
+        self.time_elapsed_auto_seconds = time_elapsed_auto_seconds
+
         # These lists will have one entry per indent-level
         self.t_last = [time.time()]
         self.n_lines = [0]
         self.splice = [None]
+        self.time_elapsed = ["auto"]
 
         # This list will be a stack with one entry per verbosity state.  Initialize with the given default.
         self.verbosity: List = []
@@ -121,7 +133,7 @@ class LogStream(object):
 
         self._halt = False
 
-    def open(self, msg, splice=None):
+    def open(self, msg, splice=None, time_elapsed="auto"):
         """Open a new indent bracket for the log.
 
         :param msg: An object with a __str__ method, or a list thereof
@@ -131,16 +143,14 @@ class LogStream(object):
         self.t_last.append(time.time())
         self.n_lines.append(0)
         self.splice.append(splice)
+        self.time_elapsed.append(time_elapsed)
         if splice:
             self._splice_line(splice, True)
 
-    def close(self, msg=None, time_elapsed=False):
+    def close(self, msg=None):
         """Close a new indent bracket for the log.
 
-        Add an elapsed time since the last open to the end if time_elapsed=True
-
         :param msg: An object with a __str__ method, or a list thereof
-        :param time_elapsed: Boolean flag indicating whether to report the time elapsed for this indent level
         :return: None
         """
 
@@ -152,10 +162,17 @@ class LogStream(object):
         t_last = self.t_last.pop()
         n_lines = self.n_lines.pop()
         splice = self.splice.pop()
+        time_elapsed = self.time_elapsed.pop()
 
         # This must be called every time because we need the
         # pop on t_last to keep track of the indenting level
         dt = time.time() - t_last
+
+        if time_elapsed == "auto":
+            if dt >= self.time_elapsed_auto_seconds:
+                time_elapsed = True
+            else:
+                time_elapsed = False
 
         if splice:
             self._splice_line(splice, False)
@@ -187,7 +204,7 @@ class LogStream(object):
         msg=None,
         dump_args=False,
         dump_returns=False,
-        time_elapsed=False,
+        time_elapsed="auto",
         default_verbosity="unset",
     ):
         """Decorator to add in-bound and out-bound logging to a callable.
@@ -206,14 +223,14 @@ class LogStream(object):
 
             @wraps(func)
             def wrapper(*args, **kwargs):
-                elapsed_printed = False
 
                 # Print function call
                 if msg:
-                    self.open(msg)
+                    self.open(msg, time_elapsed=time_elapsed)
                 else:
                     self.open(
-                        "Calling %s.%s()..." % (func.__module__, func.__qualname__)
+                        "Calling %s.%s()..." % (func.__module__, func.__qualname__),
+                        time_elapsed=time_elapsed,
                     )
 
                 # Report arguments
@@ -232,9 +249,7 @@ class LogStream(object):
                     self.open("Running...")
                 r = func(*args, **kwargs)
                 if dump_args or dump_returns:
-                    self.close("Done.", time_elapsed=time_elapsed)
-                    # Can't just change time_elapsed useing 'nonlocal' in Python 2, so we do things this way
-                    elapsed_printed = True
+                    self.close("Done.")
 
                 # Report returns
                 if dump_returns and r is not None:
@@ -245,10 +260,7 @@ class LogStream(object):
                         self.comment("Return: " + r)
 
                 # We don't need to display time elapsed twice ...
-                if elapsed_printed:
-                    self.close("Done.")
-                else:
-                    self.close("Done.", time_elapsed=time_elapsed)
+                self.close("Done.")
                 return r
 
             return update_wrapper(wrapper, func)
@@ -269,7 +281,7 @@ class LogStream(object):
             if exc_type is not None:
                 self._exception_handler(exc_val)
             else:
-                self.stream.close("Done")
+                self.stream.close("Done.")
             return True
 
     def context(self, *args, **kwargs):
@@ -347,7 +359,7 @@ class LogStream(object):
             if exc_type is not None:
                 self._exception_handler(exc_val)
             else:
-                self.stream.close("Done")
+                self.stream.close("Done.")
             return True
 
     def progress(self, *args, **kwargs):
