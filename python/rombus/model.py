@@ -6,14 +6,13 @@ import timeit
 from abc import ABCMeta, abstractmethod
 from collections import Counter
 from typing import Any, Dict, Self, Tuple, TYPE_CHECKING
-from tqdm.auto import tqdm  # type: ignore
 
 import numpy as np
 
-import rombus._core.mpi as mpi
 import rombus._core.hdf5 as hdf5
 import rombus.exceptions as exceptions
 from rombus.params import Params
+from rombus._core.log import log
 from typing import NamedTuple
 
 # Need to put Samples in quotes below and check TYPE_CHECKING here to
@@ -132,6 +131,7 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         pass
 
     @classmethod
+    @log.callable("Instantiating model from file")
     def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
         """Generate a RombusModel instance from a Rombus HDF5 file.
 
@@ -152,10 +152,11 @@ class RombusModel(metaclass=_RombusModelABCMeta):
             if close_file:
                 h5file.close()
         except IOError as e:
-            exceptions.handle_exception(e)
+            log.handle_exception(e)
         return cls.load(model_str)
 
     @classmethod
+    @log.callable("Loading model from file")
     def load(cls, model: str | Self) -> Self:
 
         """Ensure that a model has been imported for use by Rombus.
@@ -175,7 +176,7 @@ class RombusModel(metaclass=_RombusModelABCMeta):
             try:
                 model_class = _import_from_string(model)
             except exceptions.RombusException as e:
-                exceptions.handle_exception(e)
+                log.handle_exception(e)
             else:
                 return model_class(model)
         elif not isinstance(model, RombusModel):
@@ -184,6 +185,7 @@ class RombusModel(metaclass=_RombusModelABCMeta):
             )
         return model  # type: ignore
 
+    @log.callable("Writing model to file")
     def write(self, h5file: hdf5.File) -> None:
         """Write a RombusModel to a Rombus HDF5 file.
 
@@ -197,7 +199,7 @@ class RombusModel(metaclass=_RombusModelABCMeta):
             h5_group = h5file.create_group("model")
             h5_group.create_dataset("model_str", data=self.model_str)
         except IOError as e:
-            exceptions.handle_exception(e)
+            log.handle_exception(e)
 
     # Need to put Samples in quotes and check TYPE_CHECKING above to manage circular import with models.py
     def generate_model_set(self, samples: "Samples") -> np.ndarray:
@@ -217,11 +219,11 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         my_ts: np.ndarray = np.zeros(
             shape=(samples.n_samples, self.n_domain), dtype=self.model_dtype
         )
-        for i, params_numpy in enumerate(
-            tqdm(samples.samples, desc=f"Generating training set for rank {mpi.RANK}")
-        ):
-            model_i = self.compute(self.params.np2param(params_numpy), self.domain)
-            my_ts[i] = model_i / np.sqrt(np.vdot(model_i, model_i))
+        with log.progress("Generating training set", samples.n_samples) as progress:
+            for i, params_numpy in enumerate(samples.samples):
+                model_i = self.compute(self.params.np2param(params_numpy), self.domain)
+                my_ts[i] = model_i / np.sqrt(np.vdot(model_i, model_i))
+                progress.update(i)
 
         return my_ts
 
@@ -291,13 +293,18 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         float
             Seconds elapsed
         """
-        start_time = timeit.default_timer()
-        for i, sample in enumerate(samples.samples):
-            params_numpy = self.params.np2param(sample)
-            _ = self.compute(params_numpy, self.domain)
+
+        with log.context(
+            f"Computing timing information for model using {samples.n_samples} samples"
+        ):
+            start_time = timeit.default_timer()
+            for i, sample in enumerate(samples.samples):
+                params_numpy = self.params.np2param(sample)
+                _ = self.compute(params_numpy, self.domain)
         return timeit.default_timer() - start_time
 
     @classmethod
+    @log.callable("Writing project template")
     def write_project_template(cls, project_name: str) -> None:
         """Write a project model to the current working directory to start a new project from.
 
@@ -325,11 +332,11 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         samples_file_out = os.path.join(os.getcwd(), f"{project_name}_samples.csv")
 
         # Copy files
-        try:
+        with log.context("Writing files"):
             shutil.copy(model_file_source, model_file_out)
+            log.comment(f"Written: {os.path.split(model_file_out)[1]}")
             shutil.copy(samples_file_source, samples_file_out)
-        except IOError as e:
-            exceptions.handle_exception(e)
+            log.comment(f"Written: {os.path.split(samples_file_out)[1]}")
 
 
 RombusModelType = RombusModel | str
@@ -338,6 +345,7 @@ RombusModelType = RombusModel | str
 #     https://github.com/encode/uvicorn (commit: d613cbea388bafafb6f642077c035ed137deea61)
 # Copyright © 2017-present, [Encode OSS Ltd](https://www.encode.io/).
 # All rights reserved.
+@log.callable("Importing model")
 def _import_from_string(import_str: str) -> Any:
 
     """Import a RombusModel class from a given string of the form 'python.module.name:ClassName'.
@@ -357,6 +365,9 @@ def _import_from_string(import_str: str) -> Any:
     Any
         An instance of the user-defined model class
     """
+
+    log.append(f"({import_str})...")
+
     if not isinstance(import_str, str):
         raise exceptions.RombusModelImportFromStringError(
             f'Import string must be a string with format "<module>:<attribute>".  It is actually of type {type(import_str)}.'

@@ -9,6 +9,7 @@ import rombus.plots as plots
 from rombus.model import RombusModel
 from rombus.samples import Samples
 from rombus.rom import ReducedOrderModel
+from rombus._core.log import log
 from typing import Tuple
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
@@ -20,13 +21,13 @@ FLEX_CONTEXT_SETTINGS = dict(
 
 
 class _OrderedGroup(click.Group):
-    """This class is used to ensure that the ordering of the CLI subcommands
-    are in code-order in the CLI help and documentation."""
+    """This class is used to ensure that the ordering of the CLI subcommands are in code-order in the CLI help and documentation."""
 
     def __init__(self, name=None, commands=None, **attrs):
         super(_OrderedGroup, self).__init__(name, commands, **attrs)
         #: the registered subcommands by their exported names.
         self.commands = commands or collections.OrderedDict()
+        """An ordered dict of the registered commands"""
 
     def list_commands(self, ctx: click.core.Context):
         return self.commands
@@ -35,7 +36,12 @@ class _OrderedGroup(click.Group):
 @click.group(cls=_OrderedGroup, context_settings=CONTEXT_SETTINGS)
 @click.pass_context
 def cli(ctx: click.core.Context) -> None:
-    """Perform greedy algorythm operations with Rombus"""
+    """Build and work with Reduced Order Models (ROMs) with Rombus.
+
+    Please see the Rombus documentation at https://rombus.readthedocs.io for information about how to work with Rombus.
+
+    N.B.: The commands listed below are roughly in the order that most users will need to use them.
+    """
 
     # ensure that ctx.obj exists and is a dict (in case `cli()` is called
     # by means other than the `if` block below)
@@ -45,9 +51,10 @@ def cli(ctx: click.core.Context) -> None:
 @cli.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("project_name", type=str)
 def quickstart(project_name: str) -> None:
-    """Write a project template to build a new project from"""
+    """Write a project template to kickstart the creation of a new project."""
 
-    RombusModel.write_project_template(project_name)
+    with log.context("Creating new project from template"):
+        RombusModel.write_project_template(project_name)
 
 
 @cli.command(context_settings=CONTEXT_SETTINGS)
@@ -75,45 +82,45 @@ def build(
     out: str,
     do_step: click.Choice,
 ) -> None:
-    """Build a reduced order model
+    """Build a Reduced Order Model."""
 
-    FILENAME_IN is the 'greedy points' numpy or csv file to take as input
-    """
+    with log.context("Building ROM"):
+        log.comment(f"Model:   {model}")
+        log.comment(f"Samples: {filename_samples}")
 
-    # Load model
-    try:
+        # Load model
         model_loaded = RombusModel.load(model)
-    except Exception as e:
-        print(f"Error encountered: {e}")
-        exit(1)
 
-    # Load samples
-    samples = Samples(model_loaded, filename=filename_samples)
+        # Load samples
+        samples = Samples(model_loaded, filename=filename_samples)
 
-    # Build ROM
-    ROM = ReducedOrderModel(model_loaded, samples).build(do_step=do_step)
+        # Build ROM
+        assert do_step is None or type(do_step) == str  # keeping mypy happy
+        ROM = ReducedOrderModel(model_loaded, samples).build(do_step=do_step)
 
-    # Write ROM
-    if out == "MODEL_BASENAME.hdf5":
-        filename_out = f"{model_loaded.model_basename}.hdf5"
-    else:
-        filename_out = out
-    ROM.write(filename_out)
+        # Write ROM
+        if out == "MODEL_BASENAME.hdf5":
+            filename_out = f"{model_loaded.model_basename}.hdf5"
+        else:
+            filename_out = out
+        ROM.write(filename_out)
 
 
 @cli.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("filename_ROM", type=click.Path(exists=True))
 @click.pass_context
 def refine(ctx: click.core.Context, filename_rom: str) -> None:
-    """Refine parameter sampling to impove a reduced order model"""
+    """Refine parameter sampling to improve an established reduced order model."""
 
-    # Build model and refine it
-    ROM = ReducedOrderModel.from_file(filename_rom).refine()
+    with log.context(f"Refining ROM ({filename_rom})"):
 
-    # Write results
-    filename_split = filename_rom.rsplit(".", 1)
-    filename_out = f"{filename_split[0]}_refined.{filename_split[1]}"
-    ROM.write(filename_out)
+        # Build model and refine it
+        ROM = ReducedOrderModel.from_file(filename_rom).refine()
+
+        # Write results
+        filename_split = filename_rom.rsplit(".", 1)
+        filename_out = f"{filename_split[0]}_refined.{filename_split[1]}"
+        ROM.write(filename_out)
 
 
 @cli.command(context_settings=FLEX_CONTEXT_SETTINGS)
@@ -123,18 +130,21 @@ def refine(ctx: click.core.Context, filename_rom: str) -> None:
 def evaluate(
     ctx: click.core.Context, filename_rom: str, parameters: Tuple[str, ...]
 ) -> None:
-    """Evaluate a reduced order model and compare it to truth
+    """Evaluate a reduced order model and compare it to truth.
 
-    PARAMETERS is a list of parameter values of the form A=VAL B=VAL ..."""
+    PARAMETERS is a list of parameter values of the form A=VAL B=VAL ...
+    """
 
-    # Read ROM
-    ROM = ReducedOrderModel.from_file(filename_rom)
+    with log.context("Evaluating ROM"):
 
-    # Parse the model parameters, which should have been given as arguments
-    model_params = ROM.model.parse_cli_params(parameters)
+        # Read ROM
+        ROM = ReducedOrderModel.from_file(filename_rom)
 
-    # Generate plot
-    plots.compare_rom_to_true(ROM, model_params)
+        # Parse the model parameters, which should have been given as arguments
+        model_params = ROM.model.parse_cli_params(parameters)
+
+        # Generate plot
+        plots.compare_rom_to_true(ROM, model_params)
 
 
 @cli.command(context_settings=FLEX_CONTEXT_SETTINGS)
@@ -148,31 +158,36 @@ def evaluate(
 )
 @click.pass_context
 def timing(ctx: click.core.Context, filename_rom: str, n_samples: int) -> None:
-    """Compute timing information for a ROM and it's source model"""
+    """Compute timing information for a ROM and it's source model."""
 
-    # Read ROM
-    ROM = ReducedOrderModel.from_file(filename_rom)
+    with log.context(f"Creating timing information for ROM {filename_rom}"):
+        # Read ROM
+        ROM = ReducedOrderModel.from_file(filename_rom)
 
-    # Generate the samples to be used
-    timing_sample = Samples(ROM.model, n_random=n_samples)
+        # Generate the samples to be used
+        timing_sample = Samples(ROM.model, n_random=n_samples)
 
-    # Generate timing information for model
-    timing_model = ROM.model.timing(timing_sample)
+        # Generate timing information for model
+        timing_model = ROM.model.timing(timing_sample)
 
-    # Generate timing information for ROM
-    timing_ROM = ROM.timing(timing_sample)
+        # Generate timing information for ROM
+        timing_ROM = ROM.timing(timing_sample)
 
     # Report results
-    print(
+    log.comment(
         f"Timing information for ROM:   {timing_ROM:.2e}s for {n_samples} calls ({timing_ROM/n_samples:.2e} per sample)."
     )
-    print(
+    log.comment(
         f"Timing information for model: {timing_model:.2e}s for {n_samples} calls ({timing_model/n_samples:.2e} per sample)."
     )
     if timing_ROM > timing_model:
-        print(f"ROM is {timing_ROM/timing_model:.2f}X slower than the source model.")
+        log.comment(
+            f"ROM is {timing_ROM/timing_model:.2f}X slower than the source model."
+        )
     else:
-        print(f"ROM is {timing_model/timing_ROM:.2f}X faster than the source model.")
+        log.comment(
+            f"ROM is {timing_model/timing_ROM:.2f}X faster than the source model."
+        )
 
 
 if __name__ == "__main__":

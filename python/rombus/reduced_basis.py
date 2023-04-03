@@ -1,17 +1,18 @@
-import sys
-
 import numpy as np
 
 from typing import List, Self, Tuple
 
+from math import log10
 import rombus._core.mpi as mpi
 import rombus._core.hdf5 as hdf5
 import rombus.exceptions as exceptions
+from rombus._core.log import log
 from rombus.samples import Samples
 from rombus.model import RombusModel, RombusModelType
 
 DEFAULT_TOLERANCE = 1e-14
 DEFAULT_REFINE_N_RANDOM = 100
+
 
 def _get_highest_error(error_list):
     rank, idx, err = -np.inf, -np.inf, -np.inf
@@ -23,12 +24,16 @@ def _get_highest_error(error_list):
             rank = rank_id
     return rank, idx, np.float64(err.real)
 
+
 def _dot_product(weights, a, b):
 
     assert len(a) == len(b)
     return np.vdot(a * weights, b)
 
+
 class ReducedBasis(object):
+    """Class for managing the creation of reduced basis sets."""
+
     def __init__(
         self,
         matrix: List[np.ndarray] = [],
@@ -38,78 +43,35 @@ class ReducedBasis(object):
     ):
         try:
             self.matrix = matrix
+            """List of matrices, storing the reduced bases"""
+
             self.greedypoints = greedypoints
+            """List of matrices, storing the selected greedy points"""
+
             self.error_list = error_list
+            """Errors calculated for each basis"""
+
+            self.matrix_shape: List[int]
+            """Shape of the reduced basis matrix"""
             self._set_matrix_shape()
         except exceptions.RombusException as e:
             e.handle_exception()
 
-    def _set_matrix_shape(self) -> None:
-        mtx_len = len(self.matrix)
-        self.matrix_shape = [mtx_len]
-        if mtx_len > 0:
-            mtx_dim = self.matrix[-1].shape
-            for dim in mtx_dim:
-                self.matrix_shape.append(dim)
-        else:
-            self.matrix_shape.append(0)
-
-    def compute(
-        self, model: RombusModelType, samples: Samples, tol: float = DEFAULT_TOLERANCE
-    ) -> Self:
-
-        self.model: RombusModel = RombusModel.load(model)
-
-        # Compute the model for each given sample
-        my_ts: np.ndarray = self.model.generate_model_set(samples)
-
-        if mpi.RANK_IS_MAIN:
-            print("Filling basis with greedy-algorithm")
-
-        # hardcoding 1st model to be used to start the basis
-        self._init_matrix(my_ts[0])
-        basis_indicies = [0]
-
-        # NOTE: NEED TO FIX; THE FIRST INDEX IS BEING ADDED TWICE HERE!
-        error = np.inf
-        iter = 1
-        pc_matrix: List[np.ndarray] = []
-        while error > tol:
-            self.matrix, pc_matrix, error_data = self._add_next_model_to_basis(
-                pc_matrix, my_ts, iter
-            )
-            self.matrix_shape[0] = len(self.matrix)
-            err_rnk, err_idx, error = error_data
-
-            # log and cache some data
-            m = f">>> Iter {iter:003}: err {error:.1E} (rank {err_rnk:002}@idx{err_idx:003})"
-            sys.stdout.write("\033[K" + m + "\r")
-
-            basis_index = self._convert_to_basis_index(
-                err_rnk, err_idx, samples.n_samples
-            )
-            self.error_list.append(error)
-            basis_indicies.append(basis_index)
-
-            # update iteration count
-            iter += 1
-        print("\n")
-
-        self.greedypoints = [samples.samples[i] for i in basis_indicies]
-
-        return self
-
-    def write(self, h5file: hdf5.File) -> None:
-        """Save samples to file"""
-
-        h5_group = h5file.create_group("reduced_basis")
-        h5_group.create_dataset("matrix", data=self.matrix)
-        h5_group.create_dataset("greedypoints", data=self.greedypoints)
-        h5_group.create_dataset("error_list", data=self.error_list)
-
     @classmethod
+    @log.callable("Instantiating reduced basis from file")
     def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
-        """Create a ROM instance from a file"""
+        """Instantiate a reduced basis from a Rombus file on disk.
+
+        Parameters
+        ----------
+        file_in : hdf5.FileOrFilename
+            HDF5 file (filename or opend file) to read from
+
+        Returns
+        -------
+        Self
+            Returns a reference to self so that method calls can be chained
+        """
 
         h5file, close_file = hdf5.ensure_open(file_in)
 
@@ -122,11 +84,98 @@ class ReducedBasis(object):
 
         return cls(matrix=matrix, greedypoints=greedypoints, error_list=error_list)
 
+    @log.callable("Computing reduced basis")
+    def compute(
+        self, model: RombusModelType, samples: Samples, tol: float = DEFAULT_TOLERANCE
+    ) -> Self:
+
+        """Compute a reduced basis for a given model and set of parameters.
+
+        Parameters
+        ----------
+        model : RombusModelType
+            Rombus model to compute the reduced basis for
+        samples : Samples
+            Set of parameter samples for the greedy algorithm to select from
+        tol : float
+            The absolute tolerance in the error for the greedy algorythm to use for sample selection
+
+        Returns
+        -------
+        Self
+            Returns a reference to self, so that method calls can be chained.
+        """
+
+        self.model: RombusModel = RombusModel.load(model)
+
+        # Compute the model for each given sample
+        my_ts: np.ndarray = self.model.generate_model_set(samples)
+
+        with log.progress(
+            "Filling basis with greedy-algorithm", log10(tol), reverse=True
+        ) as progress:
+
+            # hardcoding 1st model to be used to start the basis
+            self._init_matrix(my_ts[0])
+            basis_indicies = [0]
+
+            # NOTE: NEED TO FIX; THE FIRST INDEX IS BEING ADDED TWICE HERE!
+            error = np.inf
+            iter = 1
+            pc_matrix: List[np.ndarray] = []
+            while error > tol:
+                self.matrix, pc_matrix, error_data = self._add_next_model_to_basis(
+                    pc_matrix, my_ts, iter
+                )
+                self.matrix_shape[0] = len(self.matrix)
+                err_rnk, err_idx, error = error_data
+                if iter == 1:
+                    progress.reset_next(error)
+
+                basis_index = self._convert_to_basis_index(
+                    err_rnk, err_idx, samples.n_samples
+                )
+                self.error_list.append(error)
+                basis_indicies.append(basis_index)
+
+                # update iteration count
+                iter += 1
+                progress.update(log10(error))
+
+        self.greedypoints = [samples.samples[i] for i in basis_indicies]
+
+        return self
+
+    def write(self, h5file: hdf5.File) -> None:
+        """Save reduced basis to file.
+
+        Parameters
+        ----------
+        h5file : hdf5.File
+            Open HDF5 file to read from
+        """
+
+        with log.context("Writing reduced basis"):
+            h5_group = h5file.create_group("reduced_basis")
+            h5_group.create_dataset("matrix", data=self.matrix)
+            h5_group.create_dataset("greedypoints", data=self.greedypoints)
+            h5_group.create_dataset("error_list", data=self.error_list)
+
+    def _set_matrix_shape(self) -> None:
+        mtx_len = len(self.matrix)
+        self.matrix_shape = [mtx_len]
+        if mtx_len > 0:
+            mtx_dim = self.matrix[-1].shape
+            for dim in mtx_dim:
+                self.matrix_shape.append(dim)
+        else:
+            self.matrix_shape.append(0)
+
     def _add_next_model_to_basis(
         self, pc_matrix: List[np.ndarray], my_ts: np.ndarray, iter: int
     ) -> Tuple[List[np.ndarray], List[np.ndarray], Tuple[int, int, int]]:
         # project training set on basis + get errors
-        pc = self._project_onto_basis( 1.0, my_ts, iter - 1)
+        pc = self._project_onto_basis(1.0, my_ts, iter - 1)
         pc_matrix.append(pc)
 
         projection_errors = list(
@@ -170,12 +219,11 @@ class ReducedBasis(object):
         return matrix, pc_matrix, error_data
 
     def _IMGS(self, next_vec, iter):
-        """what is this doing?"""
         ortho_condition = 0.5
         norm_prev = np.sqrt(np.vdot(next_vec, next_vec))
         flag = False
         while not flag:
-            next_vec, norm_current = self._MGS( next_vec, iter)
+            next_vec, norm_current = self._MGS(next_vec, iter)
             next_vec *= norm_current
             if norm_current / norm_prev <= ortho_condition:
                 norm_prev = norm_current
@@ -186,7 +234,6 @@ class ReducedBasis(object):
         return next_vec
 
     def _MGS(self, next_vec, iter):
-        """what is this doing?"""
         dim_RB = iter
         for i in range(dim_RB):
             # --- ortho_basis = ortho_basis - L2_proj*basis; ---
@@ -196,7 +243,7 @@ class ReducedBasis(object):
         next_vec /= norm
         return next_vec, norm
 
-    def _project_onto_basis(self, integration_weights,  my_ts, iter):
+    def _project_onto_basis(self, integration_weights, my_ts, iter):
 
         pc = np.zeros(len(my_ts), dtype=self.model.model_dtype)
         for j in range(len(my_ts)):
