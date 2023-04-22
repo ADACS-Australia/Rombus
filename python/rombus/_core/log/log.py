@@ -15,6 +15,7 @@ import traceback
 
 from typing import List
 
+import os
 import sys
 import time
 import datetime
@@ -32,7 +33,7 @@ intervals = (
 
 string_types = (str, bytes)
 
-TIMING_AUTO_SECONDS_DEFAULT = 0
+TIMING_AUTO_SECONDS_DEFAULT = 0.5
 
 
 def is_nonstring_iterable(object_in):
@@ -198,6 +199,8 @@ class LogStream(object):
 
         # Halt the logger, in case we're inside nested log.contexts
         self.halt()
+
+        raise
 
     def callable(
         self,
@@ -453,10 +456,11 @@ class LogStream(object):
         :param fp_out: File pointer
         :return: None
         """
-        if fp_out is None:
-            self.fp = sys.stderr
+
+        if "PYTEST_CURRENT_TEST" in os.environ:
+            self.fp = open(os.devnull, "w")
         else:
-            self.fp = fp_out
+            self.fp = sys.stderr
 
     def set_verbosity(self, verbosity=True):
         """Add a new (and make it current) verbosity state to the stream's

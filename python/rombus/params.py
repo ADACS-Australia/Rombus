@@ -33,15 +33,16 @@ class Params(object):
             The datatype used to represent this parameter
         """
 
-        # N.B.: mypy struggles with NamedTuples, so typing is turned off for the following
-        Param = NamedTuple(f"Param{len(self.params)}", [("name", str), ("min", dtype), ("max", dtype), ("dtype", dtype)])  # type: ignore
-        self.params.append(Param(name, dtype(range_min), dtype(range_max), dtype))  # type: ignore
-        self.count = self.count + 1
-        self.names.append(name)
+        with log.context(f"Adding parameter ({name})"):
+            # N.B.: mypy struggles with NamedTuples, so typing is turned off for the following
+            Param = NamedTuple(f"Param{len(self.params)}", [("name", str), ("min", dtype), ("max", dtype), ("dtype", dtype)])  # type: ignore
+            self.params.append(Param(name, dtype(range_min), dtype(range_max), dtype))  # type: ignore
+            self.count = self.count + 1
+            self.names.append(name)
 
-        # Update the named tuple that will be used to convert numpy arrays to Param objects
-        # N.B.: mypy struggles with NamedTuples, so typing is turned off for the following
-        self.params_dtype = NamedTuple("params_dtype", [(name, dtype) for name in self.names])  # type: ignore
+            # Update the named tuple that will be used to convert numpy arrays to Param objects
+            # N.B.: mypy struggles with NamedTuples, so typing is turned off for the following
+            self.params_dtype = NamedTuple("params_dtype", [(name, dtype) for name in self.names])  # type: ignore
 
     def set_validation(self, func: Callable[[NamedTuple], bool]) -> None:
         """Specify a callable which accepts a parameter set (in the form of a NamedTuple) and

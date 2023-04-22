@@ -53,7 +53,7 @@ def cli(ctx: click.core.Context) -> None:
 def quickstart(project_name: str) -> None:
     """Write a project template to kickstart the creation of a new project."""
 
-    with log.context("Creating new project from template"):
+    with log.context("Creating new project from template", time_elapsed=True):
         RombusModel.write_project_template(project_name)
 
 
@@ -84,7 +84,7 @@ def build(
 ) -> None:
     """Build a Reduced Order Model."""
 
-    with log.context("Building ROM"):
+    with log.context("Building ROM", time_elapsed=True):
         log.comment(f"Model:   {model}")
         log.comment(f"Samples: {filename_samples}")
 
@@ -100,7 +100,7 @@ def build(
 
         # Write ROM
         if out == "MODEL_BASENAME.hdf5":
-            filename_out = f"{model_loaded.model_basename}.hdf5"
+            filename_out = f"{model_loaded.basename}.hdf5"
         else:
             filename_out = out
         ROM.write(filename_out)
@@ -112,15 +112,33 @@ def build(
 def refine(ctx: click.core.Context, filename_rom: str) -> None:
     """Refine parameter sampling to improve an established reduced order model."""
 
-    with log.context(f"Refining ROM ({filename_rom})"):
+    with log.context(f"Refining ROM ({filename_rom})", time_elapsed=True):
 
         # Build model and refine it
         ROM = ReducedOrderModel.from_file(filename_rom).refine()
 
         # Write results
-        filename_split = filename_rom.rsplit(".", 1)
-        filename_out = f"{filename_split[0]}_refined.{filename_split[1]}"
+        filename_out = f"{ROM.basename}_refined.hdf5"
         ROM.write(filename_out)
+
+
+@cli.command(context_settings=FLEX_CONTEXT_SETTINGS)
+@click.argument("filename_ROM", type=str)
+@click.pass_context
+def plot_bases(
+    ctx: click.core.Context,
+    filename_rom: str,
+) -> None:
+    """Plot the bases (and their errors) of a reduced order model."""
+
+    with log.context("Plotting bases", time_elapsed=True):
+
+        # Read ROM
+        ROM = ReducedOrderModel.from_file(filename_rom)
+
+        # Generate plots
+        plots.bases(ROM)
+        plots.bases_errors(ROM)
 
 
 @cli.command(context_settings=FLEX_CONTEXT_SETTINGS)
@@ -135,7 +153,7 @@ def evaluate(
     PARAMETERS is a list of parameter values of the form A=VAL B=VAL ...
     """
 
-    with log.context("Evaluating ROM"):
+    with log.context("Evaluating ROM", time_elapsed=True):
 
         # Read ROM
         ROM = ReducedOrderModel.from_file(filename_rom)
@@ -160,7 +178,9 @@ def evaluate(
 def timing(ctx: click.core.Context, filename_rom: str, n_samples: int) -> None:
     """Compute timing information for a ROM and it's source model."""
 
-    with log.context(f"Creating timing information for ROM {filename_rom}"):
+    with log.context(
+        f"Creating timing information for ROM {filename_rom}", time_elapsed=True
+    ):
         # Read ROM
         ROM = ReducedOrderModel.from_file(filename_rom)
 
