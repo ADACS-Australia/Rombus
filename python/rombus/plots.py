@@ -22,7 +22,7 @@ def bases_errors(ROM: ReducedOrderModel) -> None:
         List of errors
     """
 
-    filename_out = f"{ROM.basename}_bases_errors.png"
+    filename_out = f"{ROM.basename}_bases_errors.pdf"
 
     with log.context("Generating plot of errors"):
         if ROM is None or ROM.reduced_basis is None:
@@ -47,7 +47,7 @@ def bases(ROM: ReducedOrderModel) -> None:
     rb_matrix : List[np.ndarray]
         List of reduced bases
     """
-    filename_out = f"{ROM.basename}_bases.png"
+    filename_out = f"{ROM.basename}_bases.pdf"
 
     with log.context("Generating plot of bases"):
         if ROM is None or ROM.reduced_basis is None:
@@ -87,7 +87,7 @@ def compare_rom_to_true(
         A dictionary of parameters to use as the input parameters
     """
 
-    filename_out = f"{ROM.basename}_comparison.png"
+    filename_out = f"{ROM.basename}_comparison.pdf"
     filename_diff_out = f"{ROM.basename}_ROM_diff"
 
     with log.context("Generating comparison plot"):

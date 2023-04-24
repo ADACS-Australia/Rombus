@@ -44,7 +44,7 @@ class Model(RombusModel):
     # an integer number of values and optional keyword values 'label' -
     # which is used for plots, etc. - and dtype, which must match the type
     # of min_value and max_value
-    coordinate.set("x", 0.0, 100.0, 1024, label="$x$", dtype=np.dtype("float64")  # type: ignore # noqa F821
+    coordinate.set("x", 0.0, 100.0, 1024, label="$x$", dtype=np.dtype("float64"))  # type: ignore # noqa F821
 
     # Set the ordinate the model will map the domain to
     # ordinate.set() takes a name and optional keyword values 'label' -
@@ -89,7 +89,7 @@ def sinc_scalar(x):
 sinc_vectorized = np.vectorize(sinc_scalar)
 ```
 Next, we need to define a set of parameter samples for which our model will be computed, the results of which will be used to
-compute our ROM.  Let's place the following in a `my_project.csv` file:
+compute our ROM.  Let's place the following in a `my_project_samples.csv` file:
 ```
 0.1
 0.5
@@ -101,26 +101,25 @@ compute our ROM.  Let's place the following in a `my_project.csv` file:
 Now we have everything we need to build a first iteration of our ROM.  This can be done with the Rombus CLI application as
 follows:
 ```sh
-$ rombus build sinc:model sinc_samples.csv
+$ rombus build my_project:Model my_project_samples.csv
 ```
 ::: {note}
 Note the syntax for specifying the model: **sub.module.name:ClassName**.  You should omit the `.py` from the filename.
 :::
 This should generate your ROM and place it in an _.hdf5_ file named `my_project.hdf5`.  Let's see how accurate it is:
 ```console
-$ rombus evaluate sinc.hdf5 2.0
+$ rombus evaluate my_project.hdf5 A=2.0
 ```
-This should place a plot in a file named `comparison.pdf` which looks similar to the following:
-![Figure 1](assets/comparison_sinc_2pt0.pdf){align=center}
+This should place a plot in a file named `my_project_comparison.pdf` which looks similar to the following:
+![Figure 1](assets/my_project_comparison_A2pt0.pdf){align=center}
 
 The agreement looks impressive, until you notice that $A=2.0$ is one of the parameter samples given above and know that ROMs are
-constructed such that they are machine-level accurate for any set of parameters used to build them.  Let's try a value that we did
-*not* use to build the model:
+constructed such that they are machine-level accurate for any set of parameters used to build them.  Let's try a value that we did *not* use to build the model:
 ```console
-$ rombus evaluate sinc.hdf5 3.5
+$ rombus evaluate my_project.hdf5 A=3.5
 ```
 This should generate the following plot:
-![Figure 2](assets/comparison_sinc_3pt5.pdf){align=center}
+![Figure 2](assets/my_project_comparison_A3pt5.pdf){align=center}
 
 Yikes.  This is not a good agreement!
 
@@ -131,10 +130,10 @@ $ rombus refine my_project.hdf5
 This instructs Rombus to iterate through sets of randomly generated parameter samples and write a new ROM to the file
 `my_project_refined.hdf5`.  Let's take a look at this new model:
 ```console
-$ rombus evaluate my_project_refined.hdf5 3.5
+$ rombus evaluate my_project_refined.hdf5 A=3.5
 ```
 This should generate the following plot:
-![Figure 3](assets/comparison_sinc_refined_3pt5.pdf){align=center}
+![Figure 3](assets/my_project_refined_comparison_A3pt5.pdf){align=center}
 Much better!
 
 One last thing: let's see how fast our ROM is relative to our original model.  We can do this by running the following:
@@ -156,7 +155,5 @@ ROM is 10.16X slower than the source model.
 **Now, go ahead and try to generate your own model.  Just modify `my_project.py` and `my_project_samples.csv` to suit your needs and repeat
 the steps above.**
 ::: {note}
-Usually, Rombus won't be used to generate representations of trivial models such as this.  It excels at furnishing representations of models
-which can take minites-to-weeks of CPU time to generate.  Once a ROM is successfuly built for such a model, analyses can be performed with
-many orders of magnitude of speed-up.
+Usually, Rombus won't be used to generate representations of trivial models such as this.  It excels at furnishing representations of models which can take minites-to-weeks of CPU time to generate.  Once a ROM is successfuly built for such a model, analyses can be performed with orders of magnitude speed-up.
 :::
