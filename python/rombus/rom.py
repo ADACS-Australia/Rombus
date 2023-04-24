@@ -1,3 +1,4 @@
+import os
 import timeit
 
 
@@ -29,6 +30,7 @@ class ReducedOrderModel(object):
         samples: Samples,
         reduced_basis: Optional[ReducedBasis] = None,
         empirical_interpolant: Optional[EmpiricalInterpolant] = None,
+        basename: Optional[str] = None,
         tol: float = DEFAULT_TOLERANCE,
     ):
 
@@ -43,6 +45,11 @@ class ReducedOrderModel(object):
 
         self.empirical_interpolant = empirical_interpolant
         """EmpiricalInterpolant generated for the ROM"""
+
+        if basename is None:
+            basename = model.basename
+        self.basename = basename
+        """Set when reading from files and provides a base name for writing plots to file, etc."""
 
     @classmethod
     @log.callable("Instantiating ROM from file")
@@ -69,6 +76,8 @@ class ReducedOrderModel(object):
             h5file
         )
 
+        basename = os.path.splitext(os.path.basename(h5file.filename))[0]
+
         if close_file:
             h5file.close()
 
@@ -77,6 +86,7 @@ class ReducedOrderModel(object):
             samples,
             reduced_basis=reduced_basis,
             empirical_interpolant=empirical_interpolant,
+            basename=basename,
         )
 
     @log.callable("Building ROM")
@@ -206,7 +216,8 @@ class ReducedOrderModel(object):
         """
 
         with log.context(
-            f"Computing timing information for ROM using {samples.n_samples} samples"
+            f"Computing timing information for ROM using {samples.n_samples} samples",
+            time_elapsed=False,
         ):
             start_time = timeit.default_timer()
             for i, sample in enumerate(samples.samples):
@@ -251,7 +262,7 @@ class ReducedOrderModel(object):
                 RB_transpose = np.transpose(self.reduced_basis.matrix)
                 selected_greedy_points = []
                 for i, validation_sample in enumerate(new_samples.samples):
-                    if self.model.model_dtype == complex:
+                    if self.model.ordinate.dtype == complex:
                         proj_error = 1 - np.sum(
                             [
                                 np.real(np.conjugate(d_i) * d_i)

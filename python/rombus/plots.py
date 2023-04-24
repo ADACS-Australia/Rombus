@@ -1,6 +1,6 @@
 import numpy as np
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import pylab as plt  # type: ignore
 
@@ -8,8 +8,12 @@ import rombus.exceptions as exceptions
 from rombus.rom import ReducedOrderModel
 from rombus._core.log import log
 
+import warnings
 
-def errors(err_list: List[float]) -> None:
+warnings.simplefilter("ignore", np.ComplexWarning)
+
+
+def bases_errors(ROM: ReducedOrderModel) -> None:
     """Generate plot of errors.
 
     Parameters
@@ -18,9 +22,14 @@ def errors(err_list: List[float]) -> None:
         List of errors
     """
 
-    filename_out = "basis_error.png"
+    filename_out = f"{ROM.basename}_bases_errors.pdf"
 
     with log.context("Generating plot of errors"):
+        if ROM is None or ROM.reduced_basis is None:
+            raise exceptions.RombusPlotError(
+                "Basis plots can not be generated for uninitialised ROM."
+            )
+        err_list = ROM.reduced_basis.error_list
         plt.plot(err_list)
         plt.xlabel("# Basis elements")
         plt.ylabel("Error")
@@ -30,7 +39,7 @@ def errors(err_list: List[float]) -> None:
         log.append(f"written to {filename_out}")
 
 
-def basis(rb_matrix: List[np.ndarray]) -> None:
+def bases(ROM: ReducedOrderModel) -> None:
     """Generate a plot of the Reduced Bases.
 
     Parameters
@@ -38,9 +47,14 @@ def basis(rb_matrix: List[np.ndarray]) -> None:
     rb_matrix : List[np.ndarray]
         List of reduced bases
     """
-    filename_out = "basis.png"
+    filename_out = f"{ROM.basename}_bases.pdf"
 
-    with log.context("Generating plot of errors"):
+    with log.context("Generating plot of bases"):
+        if ROM is None or ROM.reduced_basis is None:
+            raise exceptions.RombusPlotError(
+                "Basis plots can not be generated for uninitialised ROM."
+            )
+        rb_matrix = ROM.reduced_basis.matrix
         num_elements = len(rb_matrix)
         total_frames = 125
         n_models_per_frame = int(num_elements / total_frames)
@@ -73,7 +87,8 @@ def compare_rom_to_true(
         A dictionary of parameters to use as the input parameters
     """
 
-    filename_out = "comparison.png"
+    filename_out = f"{ROM.basename}_comparison.pdf"
+    filename_diff_out = f"{ROM.basename}_ROM_diff"
 
     with log.context("Generating comparison plot"):
         if ROM.model is None or ROM.empirical_interpolant is None:
@@ -100,11 +115,13 @@ def compare_rom_to_true(
                 )
                 model_rom = ROM.evaluate(model_params)
 
+                plt.xlabel(ROM.model.coordinate.label)
+                plt.ylabel(ROM.model.ordinate.label)
                 plt.semilogx(domain, model_rom, label="ROM", alpha=0.5, linestyle="--")
                 plt.semilogx(domain, model_full, label="Full model", alpha=0.5)
                 plt.scatter(ROM.empirical_interpolant.nodes, model_nodes, s=1)
                 plt.legend()
 
-                np.save("ROM_diff", np.subtract(model_rom, model_full))
+                np.save(filename_diff_out, np.subtract(model_rom, model_full))
                 plt.savefig(filename_out, bbox_inches="tight")
                 log.append(f"written to {filename_out}")

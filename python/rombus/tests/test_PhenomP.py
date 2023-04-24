@@ -5,6 +5,10 @@ from click.testing import CliRunner
 
 from rombus.cli import cli
 
+import warnings
+
+warnings.simplefilter("ignore", np.ComplexWarning)
+
 
 @pytest.mark.lalsuite
 def test_PhenomP(tmp_path):
@@ -22,7 +26,7 @@ def test_PhenomP(tmp_path):
             cli,
             [
                 "build",
-                "rombus.models.PhenomP:model",
+                "rombus.models.PhenomP:Model",
                 greedy_filename,
             ],
         )
@@ -42,6 +46,6 @@ def test_PhenomP(tmp_path):
             ],
         )
         assert result.exit_code == 0
-        delta_diff = np.load("ROM_diff.npy")
+        delta_diff = np.load("PhenomP_ROM_diff.npy")
 
     assert np.allclose(delta_diff, 0.0, rtol=rtol, atol=atol)

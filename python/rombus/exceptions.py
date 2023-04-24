@@ -27,6 +27,18 @@ class EmpiricalInterpolantNotComputedError(RombusException):
 # rombus.model exceptions
 
 
+class RombusModelOrdinateError(RombusException):
+    """Raised when an error is encountered when initialising a RombusModel ordinate."""
+
+    pass
+
+
+class RombusModelCoordinateError(RombusException):
+    """Raised when an error is encountered when initialising a RombusModel coordinate."""
+
+    pass
+
+
 class RombusModelParamsError(RombusException):
     """Raised when a Rombus model is instantiated with no parameters specified."""
 
@@ -45,22 +57,13 @@ class RombusModelInitError(RombusException):
     pass
 
 
-# rombus.params exceptions
-
-
-# class ReducedParamsError(RombusException):
-#    """Raised when ."""
-#
-#    pass
-
-
 # rombus.plots exceptions
 
 
-# class ReducedPlotsError(RombusException):
-#    """Raised when ."""
-#
-#    pass
+class RombusPlotError(RombusException):
+    """Raised when there is an error generating a plot."""
+
+    pass
 
 
 # rombus.samples exceptions

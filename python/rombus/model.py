@@ -5,7 +5,7 @@ import shutil
 import timeit
 from abc import ABCMeta, abstractmethod
 from collections import Counter
-from typing import Any, Dict, Self, Tuple, TYPE_CHECKING
+from typing import Any, Dict, Self, Optional, Tuple, TYPE_CHECKING
 
 import numpy as np
 
@@ -15,10 +15,87 @@ from rombus.params import Params
 from rombus._core.log import log
 from typing import NamedTuple
 
+import warnings
+
+warnings.simplefilter("ignore", np.ComplexWarning)
+
 # Need to put Samples in quotes below and check TYPE_CHECKING here to
 # manage circular imports with models.py
 if TYPE_CHECKING:
     from rombus.samples import Samples
+
+
+class _Ordinate(object):
+    def __init__(self):
+        self.name = None
+        self.dtype = float
+        self.label = None
+
+    def set(
+        self, name: Optional[str], dtype: type | np.dtype = float, label: str = ""
+    ) -> None:
+        """Set the details of the model's ordinate.
+
+        Parameters
+        ----------
+        name : str
+            Name of ordinate
+        dtype : type|np.dtype
+            Datatype used to represent ordinate values
+        label : str
+            A n optional label to use for the ordinate in plots, etc.
+        """
+        self.name = name
+        self.dtype = dtype
+        if label == "":
+            self.label = self.name
+        else:
+            self.label = label
+
+
+class _Coordinate(object):
+    def __init__(self):
+        self.name = None
+        self.dtype = float
+        self.min = None
+        self.max = None
+        self.label = None
+        self._values = None
+        self._n_values = 0
+
+    def set(
+        self,
+        name: str,
+        min: Any,
+        max: Any,
+        n_values: int,
+        dtype: type | np.dtype = float,
+        label: str = "",
+    ) -> None:
+        self.name = name
+        self.dtype = dtype
+        self.min = min
+        self.max = max
+        if label == "":
+            self.label = self.name
+        else:
+            self.label = label
+        if self.dtype != type(min):
+            raise exceptions.RombusModelCoordinateError(
+                f"Coordinate datatype ({self.dtype}) and min-value datatype ({type(self.min)}) don't match."
+            )
+        if self.dtype != type(max):
+            raise exceptions.RombusModelCoordinateError(
+                f"Coordinate datatype ({self.dtype}) and max-value datatype ({type(self.max)}) don't match."
+            )
+        self._n_values = n_values
+        self._values = np.linspace(self.min, self.max, self._n_values, self.dtype)
+
+    def get(self):
+        return self._values
+
+    def __len__(self):
+        return self._n_values
 
 
 class _RombusModelMeta(type):
@@ -34,8 +111,9 @@ class _RombusModelMeta(type):
         result = dict()
 
         # Initialise the following members↵
+        result["coordinate"] = _Coordinate()
+        result["ordinate"] = _Ordinate()
         result["params"] = Params()
-        result["model_dtype"] = np.dtype("float64")
 
         return result
 
@@ -54,30 +132,23 @@ class _RombusModelABCMeta(_RombusModelMeta, ABCMeta):
 class RombusModel(metaclass=_RombusModelABCMeta):
     """Baseclass from which all RombusModels must inherit."""
 
-    # These two members are instantiated by the metaclass
+    # These members are instantiated by the metaclass
+    coordinate: _Coordinate
+    """The domain on which this model is defined."""
+    ordinate: _Ordinate
+    """The ordinate that this model maps its domain to."""
     params: Params
     """The parameters defined for this model"""
-    model_dtype: type | np.dtype
-    """The datatype used to represent the model"""
-
-    domain: np.ndarray
-    """The domain on which the model will be defined"""
-
-    n_domain: int
-    """The number of elements in the domain"""
 
     def __init__(self, model: str):
 
         # Keep track of the model string so we can reinstantiate from a saved state
         self.model_str = model
-        self.model_basename = self.model_str.split(":")[0].split(".")[-1]
-
-        # Run an optional cache() method
-        self.cache()
+        self.basename = self.model_str.split(":")[0].split(".")[-1]
 
         # Initialise the domain
-        self.domain = self.set_domain()
-        self.n_domain = len(self.domain)
+        self.domain = self.coordinate.get()
+        self.n_domain = len(self.coordinate)
 
         # Check that the domain has been suitably set
         assert self.n_domain > 0
@@ -92,23 +163,12 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         return f"<RombusModel from {self.model_str}>"
 
     @abstractmethod  # make sure this is the inner-most decorator
-    def set_domain(self) -> np.ndarray:
-        """Abstract method which sets the domain on which the ROM will be defined.
-
-        Returns
-        -------
-        np.ndarray
-            Numpy array on which the ROM will be defined.
-        """
-        pass
-
-    @abstractmethod  # make sure this is the inner-most decorator
     def compute(self, params: NamedTuple, domain: np.ndarray) -> np.ndarray:
         """Abstract method which computes the user's model.
 
         This method does all the work of computing the user's model.  It takes a parameter set as a named tuple
         with N elements given by the names given to the N calls made to params.add() as well as the array set
-        by self.set_domain() and returns a numpy array.
+        by coordinate.set() and returns a numpy array.
 
         Parameters
         ----------
@@ -122,12 +182,6 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         np.ndarray
             The user's model, computed for the given parameter set and domain
         """
-        pass
-
-    def cache(self):
-        """This method gets called once before any calls to compute().  Users can override this method and add
-        members to the class which will be available in compute().  This provides a way to perform expensive
-        one-time calculations, reducing runtime."""
         pass
 
     @classmethod
@@ -217,12 +271,12 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         """
 
         my_ts: np.ndarray = np.zeros(
-            shape=(samples.n_samples, self.n_domain), dtype=self.model_dtype
+            shape=(samples.n_samples, self.n_domain), dtype=self.ordinate.dtype
         )
         with log.progress("Generating training set", samples.n_samples) as progress:
             for i, params_numpy in enumerate(samples.samples):
                 model_i = self.compute(self.params.np2param(params_numpy), self.domain)
-                my_ts[i] = model_i / np.sqrt(np.vdot(model_i, model_i))
+                my_ts[i] = model_i / np.sqrt(np.vdot(model_i, model_i).real)
                 progress.update(i)
 
         return my_ts
@@ -295,7 +349,8 @@ class RombusModel(metaclass=_RombusModelABCMeta):
         """
 
         with log.context(
-            f"Computing timing information for model using {samples.n_samples} samples"
+            f"Computing timing information for model using {samples.n_samples} samples",
+            time_elapsed=False,
         ):
             start_time = timeit.default_timer()
             for i, sample in enumerate(samples.samples):

@@ -129,8 +129,11 @@ class ReducedBasis(object):
                 )
                 self.matrix_shape[0] = len(self.matrix)
                 err_rnk, err_idx, error = error_data
+
+                # Set a sensible starting value for the progress counter
+                log10_error = log10(max(tol, error))
                 if iter == 1:
-                    progress.reset_next(error)
+                    progress.reset_next(log10_error)
 
                 basis_index = self._convert_to_basis_index(
                     err_rnk, err_idx, samples.n_samples
@@ -140,7 +143,7 @@ class ReducedBasis(object):
 
                 # update iteration count
                 iter += 1
-                progress.update(log10(error))
+                progress.update(log10_error)
 
         self.greedypoints = [samples.samples[i] for i in basis_indicies]
 
@@ -245,7 +248,7 @@ class ReducedBasis(object):
 
     def _project_onto_basis(self, integration_weights, my_ts, iter):
 
-        pc = np.zeros(len(my_ts), dtype=self.model.model_dtype)
+        pc = np.zeros(len(my_ts), dtype=self.model.ordinate.dtype)
         for j in range(len(my_ts)):
             pc[j] = _dot_product(integration_weights, self.matrix[iter], my_ts[j])
         return pc

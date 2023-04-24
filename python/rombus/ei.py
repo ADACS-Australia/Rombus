@@ -156,8 +156,6 @@ class _EmpiricalInterpolation(_LinAlg):
         return self.solve_triangular(
             R[:, indices], b, lower=False, check_finite=check_finite
         )
-        # return solve_triangular(
-        #    R[:,indices], b, lower=False, check_finite=check_finite)
 
     def eim_interpolant(self, invV, R):
         """The empirical interpolation matrix 'B'"""
@@ -274,12 +272,28 @@ class EmpiricalInterpolant(object):
         eim = _StandardEIM(
             reduced_basis.matrix_shape[0],
             reduced_basis.matrix_shape[1],
-            dtype=reduced_basis.model.model_dtype,
+            dtype=reduced_basis.model.ordinate.dtype,
         )
         eim.make(reduced_basis.matrix)
 
         domain = reduced_basis.model.domain
         self.nodes = domain[eim.indices]
+
+        # #########################################################
+        # import sys
+        # last_j = -1
+        # sorted_zipped = sorted(enumerate(eim.indices), key=lambda x: x[1])
+        # print(sorted_zipped)
+        # for i,j in sorted_zipped:
+        #     if j==last_j:
+        #         print(i,j)
+        #     last_j = j
+        # sys.exit()
+        # zipped = list(zip(self.nodes, eim.B))
+        # sorted_zipped = sorted(zipped, key=lambda x: x[0])
+        # self.nodes, self.B_matrix = zip(*sorted_zipped)
+        # #########################################################
+
         self.nodes, self.B_matrix = zip(*sorted(zip(self.nodes, eim.B)))
 
         return self
