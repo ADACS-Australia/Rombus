@@ -20,10 +20,10 @@ class Model(RombusModel):
     WFdict = lal.CreateDict()
 
     # Set the domain over-and-on which the ROM will be defined
-    coordinate.set("f", f_min, f_max, n_f, label="$f$")  # type: ignore # noqa F821
+    coordinate.set("f", f_min, f_max, n_f, label="$f$", dtype=np.dtype("float64"))  # type: ignore # noqa F821
 
     # Set the ordinate the model will map the domain to
-    ordinate.set("h", dtype=np.dtype("float64"), label="$h$")  # type: ignore # noqa F821
+    ordinate.set("h", label="$h$", dtype=complex)  # type: ignore # noqa F821
 
     # N.B.: mypy struggles with NamedTuples, so typing is turned off for the following
     params.add("m1", 30, 35)  # type: ignore # noqa F821
@@ -37,16 +37,9 @@ class Model(RombusModel):
 
     def compute(self, params: NamedTuple, domain: np.ndarray) -> np.ndarray:
 
-        from rombus._core.log import log
-
         lalsimulation.SimInspiralWaveformParamsInsertTidalLambda1(self.WFdict, self.l_1)
         lalsimulation.SimInspiralWaveformParamsInsertTidalLambda2(self.WFdict, self.l_2)
         if not np.array_equiv(domain, self.domain):
-            d_i_last = 0.0
-            for d_i in domain:
-                if d_i <= d_i_last:
-                    log.comment(f"XXXX: {d_i} {d_i-d_i_last}")
-                d_i_last = d_i
             h = lalsimulation.SimIMRPhenomPFrequencySequence(
                 domain,
                 params.chi1L,  # type: ignore
