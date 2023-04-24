@@ -9,11 +9,16 @@ import math
 
 # *** The following class demonstrates the elements needed to define a model for Rombus ***
 #
-# It must inherit from the RombusModel Class (which is imported above).  The class
-# must include one-or-more calls to 'params.add_param()' to define the names and limits of
-# the parameters of the model and define a 'compute' method which takes a parameter set
-# as a named tuple and a domain specified as a numpy array.  It needs to return a model for
-# this parameter set for each value of the given domain
+# It must do the following:
+#    1. inherit from the RombusModel Class (which is imported above);
+#    2. call `coordinate.set()` to define the domain on which the ROM will be defined;
+#    3. call `ordinate.set()` to define the name and type of the space the model will
+#       map the domain onto
+#    4. include one-or-more calls to 'params.add_param()' to define the names and
+#       limits of the parameters of the model; over-and-on
+#    5. define a 'compute' method which takes a parameter set as a named tuple, a
+#       domain specified as a numpy array, and returns a numpy array of the type
+#       specified by `ordinate.set()`.
 
 
 class Model(RombusModel):
@@ -24,13 +29,13 @@ class Model(RombusModel):
     # an integer number of values and optional keyword values 'label' -
     # which is used for plots, etc. - and dtype, which must match the type
     # of min_value and max_value
-    coordinate.set("x", 0.0, 100.0, 1024, label="$x$")  # type: ignore # noqa F821
+    coordinate.set("x", 0.0, 100.0, 1024, label="$x$", dtype=np.dtype("float64"))  # type: ignore # noqa F821
 
     # Set the ordinate the model will map the domain to
     # ordinate.set() takes a name and optional keyword values 'label' -
     # which is used for plots, etc. - and dtype, which must match the type
     # returned by the compute() method defined below.
-    ordinate.set("y", dtype=np.dtype("float64"), label="$sinc(x)$")  # type: ignore # noqa F821
+    ordinate.set("y", label="$sinc(x)$", dtype=np.dtype("float64"))  # type: ignore # noqa F821
 
     # Add as many calls to params.add() as your model has parameters.
     # Samples will be sent to the 'compute()' method (see below) as
@@ -64,6 +69,6 @@ def sinc_scalar(x):
 
 
 # Use np.vectorize() to create a function that accepts a
-# numpy array and returns a numpy array.  This will be them
-# function that Rombus actually calls to compute the model
+# numpy array and returns a numpy array.  This will be the
+# function the model calls to do the actual work
 sinc_vectorized = np.vectorize(sinc_scalar)
