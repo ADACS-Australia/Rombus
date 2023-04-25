@@ -8,25 +8,28 @@ jobs:
   configuration:
     runs-on: ubuntu-latest
     steps:
+
+    - name: Check-out repo
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
+
     - name: Config git
       run: |
         git config --global user.email "github+actions@gmail.com"
         git config --global user.name "Actions"
 
-  major_bump:
-    if: contains(github.event.push.head_commit.message, 'version:major')
-    run: |
-      .github/workflows/bump.sh major
+    - name: Bump major
+      if: contains(github.event.push.head_commit.message, 'version:major')
+      run: |
+        .github/workflows/bump.sh major
 
-  minor_bump:
-    if: contains(github.event.push.head_commit.message, 'version:minor')
-    run: |
-      .github/workflows/bump.sh minor
+    - name: Bump minor
+      if: contains(github.event.push.head_commit.message, 'version:minor')
+      run: |
+        .github/workflows/bump.sh minor
 
-  patch_bump:
-    if: "!contains(github.event.push.head_commit.message, 'version:major') && !contains(github.event.push.head_commit.message, 'version:minor')"
-    run: |
-      .github/workflows/bump.sh patch
+    - name: Bump patch
+      if: "!contains(github.event.push.head_commit.message, 'version:major') && !contains(github.event.push.head_commit.message, 'version:minor')"
+      run: |
+        .github/workflows/bump.sh patch
