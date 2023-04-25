@@ -25,6 +25,7 @@ h5py = "^3.8.0"
 six = "^1.16.0"
 matplotlib = "^3.6.2"
 click = "^8.1.3"
+rich = "^13.3.3"
 Sphinx = { version = "^6.1.3", optional = true }
 sphinx-rtd-theme = { version = "1.2.0", optional = true }
 myst-parser = { version = "^1.0.0", optional = true }
@@ -35,7 +36,6 @@ ruff = { version = "^0.0.243", optional = true}
 sphinx-click = { version = "^4.4.0", optional = true }
 mypy = { version = "^1.1.1", optional = true }
 sphinx-copybutton = { version = "^0.5.1", optional = true }
-rich = "^13.3.3"
 
 [tool.poetry.extras]
 docs = [
@@ -58,6 +58,11 @@ rombus = "rombus.cli:cli"
 [tool.pytest.ini_options]
 markers = [ "lalsuite: Tests that require LALSuite to be installed" ]
 
+[tool.poetry-dynamic-versioning]
+enable = true
+vcs = "git"
+style = "semver"
+
 [tool.ruff]
 line-length = 88
 select = [
@@ -77,5 +82,5 @@ ignore = [
 convention = "numpy"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning"]
+build-backend = "poetry_dynamic_versioning.backend"

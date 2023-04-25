@@ -2,6 +2,7 @@ import sys
 
 import click
 
+import importlib.metadata
 import collections
 
 import rombus.plots as plots
@@ -11,6 +12,7 @@ from rombus.samples import Samples
 from rombus.rom import ReducedOrderModel
 from rombus._core.log import log
 from typing import Tuple
+
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 FLEX_CONTEXT_SETTINGS = dict(
@@ -34,6 +36,7 @@ class _OrderedGroup(click.Group):
 
 
 @click.group(cls=_OrderedGroup, context_settings=CONTEXT_SETTINGS)
+@click.version_option(importlib.metadata.version("rombus"))
 @click.pass_context
 def cli(ctx: click.core.Context) -> None:
     """Build and work with Reduced Order Models (ROMs) with Rombus.
