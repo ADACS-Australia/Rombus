@@ -20,6 +20,9 @@ jobs:
         run: |
           git config --global user.email "github+actions@gmail.com"
           git config --global user.name "Actions"
+          echo "A: "${{ github.event.push }}
+          echo "B: "${{ github.event.push.head_commit }}
+          echo "C: "${{ github.event.push.head_commit.message }}
 
       - name: Bump major
         if: contains(github.event.push.head_commit.message, '[version:major]')
