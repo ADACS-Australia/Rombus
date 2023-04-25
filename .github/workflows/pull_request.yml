@@ -5,6 +5,18 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
+
+  # Useful for workflow debugging
+  # printJob:    
+  #   name: Print event
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - name: Dump GitHub context
+  #     env:
+  #       GITHUB_CONTEXT: ${{ toJson(github) }}
+  #     run: |
+  #       echo "$GITHUB_CONTEXT"
+
   run_tests:
     runs-on: ubuntu-latest
 

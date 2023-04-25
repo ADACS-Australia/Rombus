@@ -7,6 +7,7 @@ on:
 
 jobs:
 
+  # Useful for workflow debugging
   printJob:    
     name: Print event
     runs-on: ubuntu-latest
@@ -33,13 +34,13 @@ jobs:
           git config --global user.name "Actions"
 
       - name: Bump major
-        if: contains(github.event.push.head_commit.message, '[version:major]')
+        if: contains(github.event.head_commit.message, '[version:major]')
         run: .github/workflows/bump.sh major
 
       - name: Bump minor
-        if: contains(github.event.push.head_commit.message, '[version:minor]')
+        if: contains(github.event.head_commit.message, '[version:minor]')
         run: .github/workflows/bump.sh minor
 
       - name: Bump patch
-        if: "!contains(github.event.push.head_commit.message, '[version:major]') && !contains(github.event.push.head_commit.message, '[version:minor]')"
+        if: "!contains(github.event.head_commit.message, '[version:major]') && !contains(github.event.head_commit.message, '[version:minor]')"
         run: .github/workflows/bump.sh patch
