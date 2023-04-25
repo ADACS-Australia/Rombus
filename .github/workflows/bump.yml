@@ -5,14 +5,28 @@ on:
     branches:
     - main
 jobs:
-  bump_version:
+  configuration:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    - name: Perform bump
+    - name: Config git
       run: |
         git config --global user.email "github+actions@gmail.com"
         git config --global user.name "Actions"
-        wget -O - https://raw.githubusercontent.com/treeder/bump/master/gitbump.sh | bash
+
+  major_bump:
+    if: contains(github.event.push.head_commit.message, 'version:major')
+    run: |
+      .github/workflows/bump.sh major
+
+  minor_bump:
+    if: contains(github.event.push.head_commit.message, 'version:minor')
+    run: |
+      .github/workflows/bump.sh minor
+
+  patch_bump:
+    if: "!contains(github.event.push.head_commit.message, 'version:major') && !contains(github.event.push.head_commit.message, 'version:minor')"
+    run: |
+      .github/workflows/bump.sh patch
