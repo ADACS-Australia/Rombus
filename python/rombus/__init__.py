@@ -28,5 +28,5 @@
    view the docstring) and ``rb.model??<ENTER>`` (to view the source
    code).
    """
-import importlib
-__version__ = importlib.metadata.version(__package__ or __name__)
+from importlib import metadata # make sure to import metadata explicitly
+__version__ = metadata.version(__package__ or __name__)
