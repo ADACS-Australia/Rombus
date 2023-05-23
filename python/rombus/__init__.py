@@ -9,10 +9,6 @@
    TAB-completion and introspection capabilities. See below for further
    instructions.
 
-   The docstring examples assume that `rombus` has been imported as `rb`::
-
-     >>> import rombus as rb
-
    Code snippets are indicated by three greater-than signs.
 
    Use the built-in ``help`` function to view a function's or class's
@@ -32,3 +28,5 @@
    view the docstring) and ``rb.model??<ENTER>`` (to view the source
    code).
    """
+import importlib
+__version__ = importlib.metadata.version(__package__ or __name__)
