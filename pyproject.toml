@@ -7,13 +7,10 @@ authors = [
             "J. Hu <jitinghu@swin.edu.au>",
             ]
 license = "MIT-expat"
-
 readme = "README.md"
-
 packages = [
     { include = "rombus", from = "python" }
 ]
-
 homepage = "https://github.com/ADACS-Australia/rombus"
 documentation = "https://rombus.readthedocs.io/en/latest/"
 
@@ -31,6 +28,7 @@ sphinx-rtd-theme = { version = "1.2.0", optional = true }
 myst-parser = { version = "^1.0.0", optional = true }
 pre-commit = { version = "^3.0.4", optional = true }
 pytest = { version = "^7.0", optional = true }
+pytest-cov = { version = "^4.1.0", optional = true }
 black = { version = "^22.10.0", optional = true }
 ruff = { version = "^0.0.243", optional = true}
 sphinx-click = { version = "^4.4.0", optional = true }
@@ -47,6 +45,7 @@ docs = [
 ]
 dev = ["pre-commit",
        "pytest",
+       "pytest-cov",
        "mypy",
        "black",
        "ruff",
@@ -64,7 +63,7 @@ vcs = "git"
 style = "semver"
 
 [tool.ruff]
-line-length = 88
+line-length = 88 # to match Black
 select = [
     "E",
     "F",
