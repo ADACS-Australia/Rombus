@@ -9,6 +9,18 @@ import warnings
 warnings.simplefilter("ignore", np.ComplexWarning)
 
 
+def test_cli_help(tmp_path):
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        result = runner.invoke(
+            rombus.cli.cli,
+            [
+                "--help",
+            ],
+        )
+        assert result.exit_code == 0
+
+
 def test_cli_version(tmp_path):
     runner = CliRunner()
     with runner.isolated_filesystem(temp_dir=tmp_path):
@@ -20,6 +32,7 @@ def test_cli_version(tmp_path):
         )
         assert result.exit_code == 0
         assert result.output == f"cli, version {rombus.__version__}\n"
+
 
 def test_cli_quickstart(tmp_path):
     runner = CliRunner()
@@ -36,6 +49,7 @@ def test_cli_quickstart(tmp_path):
         assert isfile(f"{test_project_name}.py")
         assert isfile(f"{test_project_name}_samples.csv")
 
+
 def test_cli_end_to_end(tmp_path):
 
     atol = 1e-6
@@ -46,7 +60,9 @@ def test_cli_end_to_end(tmp_path):
     with runner.isolated_filesystem(temp_dir=tmp_path):
 
         greedy_filename = str(
-            importlib.resources.files("rombus.models").joinpath(f"{test_model}_samples.csv")
+            importlib.resources.files("rombus.models").joinpath(
+                f"{test_model}_samples.csv"
+            )
         )
         result = runner.invoke(
             rombus.cli.cli,

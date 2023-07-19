@@ -56,11 +56,34 @@ rombus = "rombus.cli:cli"
 
 [tool.pytest.ini_options]
 markers = [ "lalsuite: Tests that require LALSuite to be installed" ]
+addopts = "--cov"
 
 [tool.poetry-dynamic-versioning]
 enable = true
 vcs = "git"
 style = "semver"
+
+[tool.mypy]
+ignore_missing_imports = true
+mypy_path = "$MYPY_CONFIG_FILE_DIR/python"
+
+[tool.coverage.paths]
+source = ["python"]
+
+[tool.coverage.run]
+branch = true
+source = ["python"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+  "pragma: no cover",
+  "raise AssertionError",
+  "raise NotImplementedError",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+  "if typing.TYPE_CHECKING:"
+]
 
 [tool.ruff]
 line-length = 88 # to match Black
