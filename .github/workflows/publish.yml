@@ -49,14 +49,33 @@ jobs:
         run: |
           poetry version $(git describe --tags --abbrev=0)
 
-      # Publish
+      # Configure repository for test.PyPI
+      - name: Configure Poetry for test.PyPI
+        if: "github.event.release.prerelease"
+        run: |
+          poetry config repositories.testpypi https://test.pypi.org/legacy/
+          poetry config http-basic.pypi "__token__" ${{ secrets.TEST_PYPI_TOKEN }}
+
+      # Configure repository for PyPI
+      - name: Configure Poetry for PyPI
+        if: "!github.event.release.prerelease"
+        run: |
+          poetry config http-basic.pypi "__token__" ${{ secrets.PYPI_TOKEN }}
+
+      # Publish docs
       - name: Trigger RTDs build
+        if: "!github.event.release.prerelease"
         run: |
           curl -X POST                                                    \
                -H "Authorization: Token ${{ secrets.RTD_WEBHOOK_TOKEN }}" \
-               ${{ secrets.RTD_WEBHOOK_URL_ROMBUS }}
+               ${{ secrets.RTD_WEBHOOK_URL }}
 
+      # Publish project to test.PyPI
+      - name: Publish to test.PyPI
+        if: "github.event.release.prerelease"
+        run: poetry publish --build -r testpypi
+
+      # ... else publish project to PyPI
       - name: Publish to PyPI
-        run: |
-          poetry config http-basic.pypi "__token__" ${{ secrets.PYPI_TOKEN }}
-          poetry publish --build
+        if: "!github.event.release.prerelease"
+        run: poetry publish --build
