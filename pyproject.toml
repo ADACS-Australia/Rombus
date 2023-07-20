@@ -55,8 +55,8 @@ dev = ["pre-commit",
 rombus = "rombus.cli:cli"
 
 [tool.pytest.ini_options]
-markers = [ "lalsuite: Tests that require LALSuite to be installed" ]
 addopts = "--cov"
+markers = [ "lalsuite: Tests that require LALSuite to be installed" ]
 
 [tool.poetry-dynamic-versioning]
 enable = true
