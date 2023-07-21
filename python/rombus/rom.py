@@ -109,14 +109,17 @@ class ReducedOrderModel(object):
         """
 
         if do_step is None or do_step == "RB":
+            print("testA")
             try:
                 self.reduced_basis = ReducedBasis().compute(
                     self.model, self.samples, tol=tol
                 )
             except exceptions.RombusException as e:
                 e.handle_exception()
+            print("testB")
 
         if do_step is None or do_step == "EI":
+            print("testC")
             if self.reduced_basis is None:
                 raise exceptions.ReducedBasisNotComputedError(
                     "A ROM whose ReducedBasis has not been computed has been asked to comput its EmpiricalInterpolant.  Compute the ReducedBasis first and try again."
@@ -124,7 +127,9 @@ class ReducedOrderModel(object):
             self.empirical_interpolant = EmpiricalInterpolant().compute(
                 self.reduced_basis
             )
+            print("testD")
 
+        print("testE")
         return self
 
     def evaluate(self, params: NamedTuple) -> np.ndarray:

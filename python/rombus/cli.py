@@ -102,11 +102,14 @@ def build(
         ROM = ReducedOrderModel(model_loaded, samples).build(do_step=do_step)
 
         # Write ROM
+        print("\ntest1\n")
         if out == "MODEL_BASENAME.hdf5":
             filename_out = f"{model_loaded.basename}.hdf5"
         else:
             filename_out = out
+        print("\ntest2\n")
         ROM.write(filename_out)
+        print("\ntest3\n")
 
 
 @cli.command(context_settings=CONTEXT_SETTINGS)

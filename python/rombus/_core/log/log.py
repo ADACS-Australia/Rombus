@@ -450,8 +450,7 @@ class LogStream(object):
         return decorated_class_declaration
 
     def set_fp(self, fp_out=None):
-        """Set the file pointer to be used for logging.  Default is
-        `sys.stderr`.
+        """Set the file pointer to be used for logging.  Default is `sys.stdout`.
 
         :param fp_out: File pointer
         :return: None
@@ -460,7 +459,8 @@ class LogStream(object):
         if "PYTEST_CURRENT_TEST" in os.environ:
             self.fp = open(os.devnull, "w")
         else:
-            self.fp = sys.stderr
+            # self.fp = sys.stderr
+            self.fp = sys.stdout
 
     def set_verbosity(self, verbosity=True):
         """Add a new (and make it current) verbosity state to the stream's
