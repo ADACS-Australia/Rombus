@@ -100,6 +100,7 @@ def build(
         # Build ROM
         assert do_step is None or type(do_step) == str  # keeping mypy happy
         ROM = ReducedOrderModel(model_loaded, samples).build(do_step=do_step)
+        log.comment("test")
 
         # Write ROM
         if out == "MODEL_BASENAME.hdf5":
