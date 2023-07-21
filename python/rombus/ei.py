@@ -295,6 +295,8 @@ class EmpiricalInterpolant(object):
         # #########################################################
 
         log.comment("testZ4")
+        log.comment(f"nodes: {self.nodes}")
+        log.comment(f"eim.B: {eim.B}")
         self.nodes, self.B_matrix = zip(*sorted(zip(self.nodes, eim.B)))
         log.comment("testZ5")
 
