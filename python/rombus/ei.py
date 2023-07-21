@@ -269,15 +269,12 @@ class EmpiricalInterpolant(object):
             A reference to self, to allow for chaining of method calls
         """
 
-        log.comment("testZ1")
         eim = _StandardEIM(
             reduced_basis.matrix_shape[0],
             reduced_basis.matrix_shape[1],
             dtype=reduced_basis.model.ordinate.dtype,
         )
-        log.comment("testZ2")
         eim.make(reduced_basis.matrix)
-        log.comment("testZ3")
 
         domain = reduced_basis.model.domain
         self.nodes = domain[eim.indices]
