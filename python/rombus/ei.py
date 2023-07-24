@@ -293,7 +293,9 @@ class EmpiricalInterpolant(object):
         # sorted_zipped = sorted(zipped, key=lambda x: x[0])
         # self.nodes, self.B_matrix = zip(*sorted_zipped)
         # #########################################################
-
+        log.comment(f"nodes: {type(self.nodes)} --- {self.nodes.shape}")
+        log.comment(f"nodes: {self.nodes}")
+        log.comment(f"eim:B: {type(eim.B)} --- {eim.B.shape}")
         self.nodes, self.B_matrix = zip(
             *sorted(zip(self.nodes, eim.B), key=lambda x: x[0])
         )

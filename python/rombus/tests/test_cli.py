@@ -72,8 +72,6 @@ def test_cli_end_to_end(tmp_path):
                 greedy_filename,
             ],
         )
-        print(result)
-        print(result.exit_code)
         assert result.exit_code == 0
         assert isfile(f"{test_model}.hdf5")
 
