@@ -255,11 +255,10 @@ class EmpiricalInterpolant(object):
         """Interpolant nodes"""
 
     def __str__(self):
-        result = ""
+        result = f"\nContents of instance of {type(self)}:\n"
         result = result + "B_matrix:\n"
         result = result + str(self.B_matrix) + "\n"
-        result = result + "nodes:\n"
-        result = result + str(self.nodes) + "\n"
+        result = result + "nodes: " + str(self.nodes)
 
         return result
 

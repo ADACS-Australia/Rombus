@@ -58,15 +58,12 @@ class ReducedBasis(object):
             e.handle_exception()
 
     def __str__(self):
-        result = ""
-        result = result + "matrix:\n"
+        result = f"\nContents of instance of {type(self)}:\n"
+        result = result + "   matrix:\n"
         result = result + str(self.matrix) + "\n"
-        result = result + "greedypoints:\n"
-        result = result + str(self.greedypoints) + "\n"
-        result = result + "error_list:\n"
-        result = result + str(self.error_list) + "\n"
-        result = result + "matrix_shape:\n"
-        result = result + str(self.matrix_shape) + "\n"
+        result = result + "   greedypoints:" + str(self.greedypoints) + "\n"
+        result = result + "   error_list:  " + str(self.error_list) + "\n"
+        result = result + "   matrix_shape:" + str(self.matrix_shape)
 
         return result
 

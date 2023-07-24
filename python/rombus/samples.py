@@ -44,11 +44,11 @@ class Samples(object):
             self._add_random_samples(self.n_random)
 
     def __str__(self):
-        result = ""
-        result = result + "model:    " + str(self.model) + "\n"
-        result = result + "n_random: " + str(self.n_random) + "\n"
-        result = result + "n_samples:\n" + str(self.n_samples) + "\n"
-        result = result + "samples:  \n" + str(self.samples) + "\n"
+        result = f"\nContents of instance of {type(self)}:\n"
+        result = result + "   model:    " + str(self.model) + "\n"
+        result = result + "   n_random: " + str(self.n_random) + "\n"
+        result = result + "   n_samples:" + str(self.n_samples) + "\n"
+        result = result + "   samples:  " + str(self.samples)
 
         return result
 
