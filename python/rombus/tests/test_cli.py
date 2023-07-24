@@ -84,7 +84,7 @@ def test_cli_end_to_end(tmp_path):
             ],
         )
 
-        from rombus.log import log
+        from rombus._core.log import log
         from rombus.rom import ReducedOrderModel
 
         ROM = ReducedOrderModel.from_file(f"{test_model}.hdf5")
