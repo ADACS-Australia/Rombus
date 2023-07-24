@@ -84,9 +84,14 @@ def test_cli_end_to_end(tmp_path):
             ],
         )
 
-        import os
+        from rombus.log import log
+        from rombus.rom import ReducedOrderModel
 
-        os.system(f"h5dump {test_model}.hdf5")
+        ROM = ReducedOrderModel.from_file(f"{test_model}.hdf5")
+        log.comment(f"model:   {ROM.model}")
+        log.comment(f"samples: {ROM.samples}")
+        log.comment(f"RB:      {ROM.reduced_basis}")
+        log.comment(f"EI:      {ROM.empirical_interpolant}")
 
         assert result.exit_code == 0
         assert isfile(f"{test_model}_comparison.pdf")
