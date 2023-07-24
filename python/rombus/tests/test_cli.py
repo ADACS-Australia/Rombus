@@ -99,6 +99,7 @@ def test_cli_end_to_end(tmp_path):
         delta_diff = np.load(f"{test_model}_ROM_diff.npy")
         assert np.allclose(delta_diff, 0.0, rtol=rtol, atol=atol)
 
+        log.comment("testA")
         result = runner.invoke(
             rombus.cli.cli,
             [
@@ -111,6 +112,7 @@ def test_cli_end_to_end(tmp_path):
         assert isfile(f"{test_model}_ROM_diff.npy")
         delta_diff = np.load(f"{test_model}_ROM_diff.npy")
         assert not np.allclose(delta_diff, 0.0, atol=atol)
+        log.comment("testB")
 
         result = runner.invoke(
             rombus.cli.cli,
@@ -121,6 +123,7 @@ def test_cli_end_to_end(tmp_path):
         )
         assert result.exit_code == 0
         assert isfile(f"{test_model}_refined.hdf5")
+        log.comment("testC")
 
         result = runner.invoke(
             rombus.cli.cli,
@@ -130,6 +133,8 @@ def test_cli_end_to_end(tmp_path):
                 "A=3.5",
             ],
         )
+        log.comment("testD")
         assert result.exit_code == 0
         delta_diff = np.load(f"{test_model}_refined_ROM_diff.npy")
         assert np.allclose(delta_diff, 0.0, atol=atol)
+        log.comment("testE")
