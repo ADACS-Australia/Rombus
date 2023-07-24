@@ -279,26 +279,14 @@ class EmpiricalInterpolant(object):
         domain = reduced_basis.model.domain
         self.nodes = domain[eim.indices]
 
-        # #########################################################
-        # import sys
-        # last_j = -1
-        # sorted_zipped = sorted(enumerate(eim.indices), key=lambda x: x[1])
-        # print(sorted_zipped)
-        # for i,j in sorted_zipped:
-        #     if j==last_j:
-        #         print(i,j)
-        #     last_j = j
-        # sys.exit()
-        # zipped = list(zip(self.nodes, eim.B))
-        # sorted_zipped = sorted(zipped, key=lambda x: x[0])
-        # self.nodes, self.B_matrix = zip(*sorted_zipped)
-        # #########################################################
         log.comment(f"nodes: {type(self.nodes)} --- {self.nodes.shape}")
         log.comment(f"nodes: {self.nodes}")
         log.comment(f"eim:B: {type(eim.B)} --- {eim.B.shape}")
         self.nodes, self.B_matrix = zip(
             *sorted(zip(self.nodes, eim.B), key=lambda x: x[0])
         )
+        log.comment(f"nodes: {type(self.nodes)} --- {self.nodes.shape}")
+        log.comment(f"B_mtx: {type(self.B_matrix)} --- {self.B_matrix.shape}")
 
         return self
 
