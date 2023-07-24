@@ -84,22 +84,12 @@ def test_cli_end_to_end(tmp_path):
             ],
         )
 
-        from rombus._core.log import log
-        from rombus.rom import ReducedOrderModel
-
-        ROM = ReducedOrderModel.from_file(f"{test_model}.hdf5")
-        log.comment(f"{ROM.model}")
-        log.comment(f"{ROM.samples}")
-        log.comment(f"{ROM.reduced_basis}")
-        log.comment(f"{ROM.empirical_interpolant}")
-
         assert result.exit_code == 0
         assert isfile(f"{test_model}_comparison.pdf")
         assert isfile(f"{test_model}_ROM_diff.npy")
         delta_diff = np.load(f"{test_model}_ROM_diff.npy")
         assert np.allclose(delta_diff, 0.0, rtol=rtol, atol=atol)
 
-        log.comment("testA")
         result = runner.invoke(
             rombus.cli.cli,
             [
@@ -112,7 +102,6 @@ def test_cli_end_to_end(tmp_path):
         assert isfile(f"{test_model}_ROM_diff.npy")
         delta_diff = np.load(f"{test_model}_ROM_diff.npy")
         assert not np.allclose(delta_diff, 0.0, atol=atol)
-        log.comment("testB")
 
         result = runner.invoke(
             rombus.cli.cli,
@@ -123,7 +112,14 @@ def test_cli_end_to_end(tmp_path):
         )
         assert result.exit_code == 0
         assert isfile(f"{test_model}_refined.hdf5")
-        log.comment("testC")
+
+        # from rombus._core.log import log
+        # from rombus.rom import ReducedOrderModel
+        # ROM = ReducedOrderModel.from_file(f"{test_model}.hdf5")
+        # log.comment(f"{ROM.model}")
+        # log.comment(f"{ROM.samples}")
+        # log.comment(f"{ROM.reduced_basis}")
+        # log.comment(f"{ROM.empirical_interpolant}")
 
         result = runner.invoke(
             rombus.cli.cli,
@@ -133,8 +129,6 @@ def test_cli_end_to_end(tmp_path):
                 "A=3.5",
             ],
         )
-        log.comment("testD")
         assert result.exit_code == 0
         delta_diff = np.load(f"{test_model}_refined_ROM_diff.npy")
         assert np.allclose(delta_diff, 0.0, atol=atol)
-        log.comment("testE")
