@@ -83,6 +83,11 @@ def test_cli_end_to_end(tmp_path):
                 "A=2",
             ],
         )
+
+        import os
+
+        os.system(f"h5dump {test_model}.hdf5")
+
         assert result.exit_code == 0
         assert isfile(f"{test_model}_comparison.pdf")
         assert isfile(f"{test_model}_ROM_diff.npy")
