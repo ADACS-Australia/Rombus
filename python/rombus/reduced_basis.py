@@ -57,6 +57,19 @@ class ReducedBasis(object):
         except exceptions.RombusException as e:
             e.handle_exception()
 
+    def __str__(self):
+        result = ""
+        result = result + "matrix:\n"
+        result = result + str(self.matrix) + "\n"
+        result = result + "greedypoints:\n"
+        result = result + str(self.greedypoints) + "\n"
+        result = result + "error_list:\n"
+        result = result + str(self.error_list) + "\n"
+        result = result + "matrix_shape:\n"
+        result = result + str(self.matrix_shape) + "\n"
+
+        return result
+
     @classmethod
     @log.callable("Instantiating reduced basis from file")
     def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:

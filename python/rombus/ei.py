@@ -254,6 +254,15 @@ class EmpiricalInterpolant(object):
         self.nodes = nodes
         """Interpolant nodes"""
 
+    def __str__(self):
+        result = ""
+        result = result + "B_matrix:\n"
+        result = result + str(self.B_matrix) + "\n"
+        result = result + "nodes:\n"
+        result = result + str(self.nodes) + "\n"
+
+        return result
+
     @log.callable("Computing empirical interpolant")
     def compute(self, reduced_basis: ReducedBasis) -> Self:
         """Compute empirical interpolant for a given reduced basis
