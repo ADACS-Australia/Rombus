@@ -14,11 +14,11 @@ DEFAULT_TOLERANCE = 1e-14
 DEFAULT_REFINE_N_RANDOM = 100
 
 
-def _get_highest_error(error_list):
+def _get_highest_error(error_list, basis_indices):
     rank, idx, err = -np.inf, -np.inf, -np.inf
     for rank_id, rank_errors in enumerate(error_list):
         max_rank_err = max(rank_errors)
-        if max_rank_err > err:
+        if max_rank_err > err and idx not in basis_indices:
             err = max_rank_err
             idx = rank_errors.index(err)
             rank = rank_id
@@ -132,17 +132,18 @@ class ReducedBasis(object):
             # NOTE: NEED TO FIX; THE FIRST INDEX IS BEING ADDED TWICE HERE!
             error = np.inf
             iter = 1
+            flag_first_iteration = True
             pc_matrix: List[np.ndarray] = []
             while error > tol:
                 self.matrix, pc_matrix, error_data = self._add_next_model_to_basis(
-                    pc_matrix, my_ts, iter
+                    pc_matrix, my_ts, basis_indicies, iter
                 )
                 self.matrix_shape[0] = len(self.matrix)
                 err_rnk, err_idx, error = error_data
 
                 # Set a sensible starting value for the progress counter
                 log10_error = log10(max(tol, error))
-                if iter == 1:
+                if flag_first_iteration:
                     progress.reset_next(log10_error)
 
                 basis_index = self._convert_to_basis_index(
@@ -151,9 +152,10 @@ class ReducedBasis(object):
                 self.error_list.append(error)
                 basis_indicies.append(basis_index)
 
-                # update iteration count
-                iter += 1
+                # update counters and flags
                 progress.update(log10_error)
+                iter += 1
+                flag_first_iteration = False
 
         self.greedypoints = [samples.samples[i] for i in basis_indicies]
 
@@ -185,7 +187,11 @@ class ReducedBasis(object):
             self.matrix_shape.append(0)
 
     def _add_next_model_to_basis(
-        self, pc_matrix: List[np.ndarray], my_ts: np.ndarray, iter: int
+        self,
+        pc_matrix: List[np.ndarray],
+        my_ts: np.ndarray,
+        basis_indices: List[int],
+        iter: int,
     ) -> Tuple[List[np.ndarray], List[np.ndarray], Tuple[int, int, int]]:
         # project training set on basis + get errors
         pc = self._project_onto_basis(1.0, my_ts, iter - 1)
@@ -203,7 +209,7 @@ class ReducedBasis(object):
 
         # determine highest error
         if mpi.RANK_IS_MAIN:
-            error_data = _get_highest_error(all_rank_errors)
+            error_data = _get_highest_error(all_rank_errors, basis_indices)
             err_rank, err_idx, error = error_data
         else:
             error_data = None, None, None
