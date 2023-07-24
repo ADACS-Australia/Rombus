@@ -113,14 +113,6 @@ def test_cli_end_to_end(tmp_path):
         assert result.exit_code == 0
         assert isfile(f"{test_model}_refined.hdf5")
 
-        # from rombus._core.log import log
-        # from rombus.rom import ReducedOrderModel
-        # ROM = ReducedOrderModel.from_file(f"{test_model}.hdf5")
-        # log.comment(f"{ROM.model}")
-        # log.comment(f"{ROM.samples}")
-        # log.comment(f"{ROM.reduced_basis}")
-        # log.comment(f"{ROM.empirical_interpolant}")
-
         result = runner.invoke(
             rombus.cli.cli,
             [
