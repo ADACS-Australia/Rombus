@@ -282,9 +282,11 @@ class EmpiricalInterpolant(object):
         log.comment(f"nodes: {type(self.nodes)} --- {self.nodes.shape}")
         log.comment(f"nodes: {self.nodes}")
         log.comment(f"eim:B: {type(eim.B)} --- {eim.B.shape}")
-        self.nodes, self.B_matrix = zip(
+        nodes_sorted, B_matrix_sorted = zip(
             *sorted(zip(self.nodes, eim.B), key=lambda x: x[0])
         )
+        self.nodes = np.asarray(nodes_sorted)
+        self.B_matrix = np.asarray(B_matrix_sorted)
         log.comment(f"nodes: {type(self.nodes)} --- {self.nodes.shape}")
         log.comment(f"B_mtx: {type(self.B_matrix)} --- {self.B_matrix.shape}")
 
