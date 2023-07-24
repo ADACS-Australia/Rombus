@@ -43,6 +43,15 @@ class Samples(object):
         if self.n_random > 0:
             self._add_random_samples(self.n_random)
 
+    def __str__(self):
+        result = f"\nContents of instance of {type(self)}:\n"
+        result = result + "   model:    " + str(self.model) + "\n"
+        result = result + "   n_random: " + str(self.n_random) + "\n"
+        result = result + "   n_samples:" + str(self.n_samples) + "\n"
+        result = result + "   samples:  " + str(self.samples)
+
+        return result
+
     @classmethod
     def from_file(cls, file_in: hdf5.FileOrFilename) -> Self:
         """Create an instance of a Sample set from a Rombus file on disk.

@@ -44,13 +44,13 @@ class Model(RombusModel):
     # an integer number of values and optional keyword values 'label' -
     # which is used for plots, etc. - and dtype, which must match the type
     # of min_value and max_value
-    coordinate.set("x", 0.0, 100.0, 1024, label="$x$", dtype=np.dtype("float64"))  # type: ignore # noqa F821
+    coordinate.set("x", 0.0, 100.0, 1024, label="$x$", dtype=np.dtype("float64"))
 
     # Set the ordinate the model will map the domain to
     # ordinate.set() takes a name and optional keyword values 'label' -
     # which is used for plots, etc. - and dtype, which must match the type
     # returned by the compute() method defined below.
-    ordinate.set("y", label="$sinc(x)$", dtype=np.dtype("float64"))  # type: ignore # noqa F821
+    ordinate.set("y", label="$sinc(x)$", dtype=np.dtype("float64"))
 
     # Add as many calls to params.add() as your model has parameters.
     # Samples will be sent to the 'compute()' method (see below) as
@@ -61,7 +61,7 @@ class Model(RombusModel):
     # IDEs and linters have troubles following.
     #
     # Syntax: params.add(name, min_value_allowed,max_value_allowed)
-    params.add("A", 0, 10)  # type: ignore # noqa F821
+    params.add("A", 0, 10)
 
     # Compute the model.  This function should accept a named tuple with
     # member names given by the params.add() calls above and should
@@ -69,7 +69,7 @@ class Model(RombusModel):
     def compute(self, params: NamedTuple, x) -> np.ndarray:
         """Compute the model for a given parameter set."""
 
-        return sinc_vectorized(params.A * x)  # type: ignore
+        return sinc_vectorized(params.A * x)
 
 
 # Create the function that will compute our model

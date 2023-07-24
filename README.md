@@ -5,7 +5,7 @@ Rombus is a tool for building reduced order models (ROMs): matrix representation
 models which can be rapidly and easily computed for arbitrary parameter sets.
 
 Building a ROM with Rombus is easy.  All you need to do is install it like so:
-```console
+``` console
 $ pip install rombus
 ```
 define your model like this (in this trivial case, a file named `my_model.py` specifying a simple second-order polynomial):
@@ -42,11 +42,11 @@ and specify a set of points (in this case, the file `my_model_samples.py`) to bu
  10,  10, 10
 ```
 You build your ROM like this:
-```
+``` console
 $ rombus build my_model:Model my_model_samples.csv
 ```
 This produces an _HDF5_ file named `my_model.hdf5`.  You can then use your new ROM in your Python projects like this:
-```
+``` python
 from rombus.rom import ReducedOrderModel
 
 ROM = ReducedOrderModel.from_file('my_model.hdf5')

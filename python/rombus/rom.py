@@ -47,7 +47,7 @@ class ReducedOrderModel(object):
         """EmpiricalInterpolant generated for the ROM"""
 
         if basename is None:
-            basename = model.basename
+            basename = self.model.basename
         self.basename = basename
         """Set when reading from files and provides a base name for writing plots to file, etc."""
 
