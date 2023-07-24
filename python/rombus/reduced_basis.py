@@ -130,11 +130,12 @@ class ReducedBasis(object):
             basis_indicies = [0]
 
             # NOTE: NEED TO FIX; THE FIRST INDEX IS BEING ADDED TWICE HERE!
+            len_my_ts = len(my_ts)
             error = np.inf
             iter = 1
             flag_first_iteration = True
             pc_matrix: List[np.ndarray] = []
-            while error > tol:
+            while error > tol and iter < len_my_ts:
                 self.matrix, pc_matrix, error_data = self._add_next_model_to_basis(
                     pc_matrix, my_ts, basis_indicies, iter
                 )
