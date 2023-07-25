@@ -60,3 +60,8 @@ local
 htmlcov
 .coverage
 *.log
+
+# large ROM files
+*.hdf5
+*.csv
+*.pdf
