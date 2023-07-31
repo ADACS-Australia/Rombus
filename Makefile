@@ -23,9 +23,14 @@ help:
 .PHONY: help Makefile
 
 clean:
-	@rm -rf build docs/_build
 	@rm -f docs/conf.py docs/make.bat docs/Makefile
 	@rm -f docs/*.rst docs/*.md
+	@rm -rf build docs/_build dist
+	@rm -rf .tests
+	@rm -rf .pytest_cache
+	@rm -rf .cache
+	@rm -rf .ropeproject
+	@find . -type d -name "__pycache__" -exec rm -rf {} \;
 
 apidoc: clean
 	@echo "Building documentation for:"
