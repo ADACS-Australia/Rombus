@@ -13,7 +13,7 @@ PATH_EXCLUDE_LIST = docs/content python/${PKG_PROJECT}/tests python/${PKG_PROJEC
 # Set some variables needed by the documentation
 PKG_PROJECT := $(shell poetry run python3 -c 'from tomllib import load;print(load(open("pyproject.toml","rb"))["tool"]["poetry"]["name"])')
 PKG_AUTHOR  := $(shell poetry run python3 -c 'from importlib.metadata import metadata; print(metadata("${PKG_PROJECT}")["author"])')
-PKG_VERSION := `poetry run git describe --tags --abbrev=0`
+PKG_VERSION := $(word 2,$(shell poetry version))
 PKG_RELEASE := ${PKG_VERSION}
 
 # Put it first so that "make" without argument is like "make help".
@@ -23,9 +23,14 @@ help:
 .PHONY: help Makefile
 
 clean:
-	@rm -rf build docs/_build
 	@rm -f docs/conf.py docs/make.bat docs/Makefile
 	@rm -f docs/*.rst docs/*.md
+	@rm -rf build docs/_build dist
+	@rm -rf .tests
+	@rm -rf .pytest_cache
+	@rm -rf .cache
+	@rm -rf .ropeproject
+	@find . -type d -name "__pycache__" -exec rm -rf {} \;
 
 apidoc: clean
 	@echo "Building documentation for:"
@@ -37,5 +42,5 @@ apidoc: clean
 content: apidoc
 	@cp docs/content/* docs/
 
-%: Makefile content
-	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+docs: content
+	@$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
