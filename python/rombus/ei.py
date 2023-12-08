@@ -254,6 +254,14 @@ class EmpiricalInterpolant(object):
         self.nodes = nodes
         """Interpolant nodes"""
 
+    def __str__(self):
+        result = f"\nContents of instance of {type(self)}:\n"
+        result = result + "B_matrix:\n"
+        result = result + str(self.B_matrix) + "\n"
+        result = result + "nodes: " + str(self.nodes)
+
+        return result
+
     @log.callable("Computing empirical interpolant")
     def compute(self, reduced_basis: ReducedBasis) -> Self:
         """Compute empirical interpolant for a given reduced basis
@@ -279,22 +287,11 @@ class EmpiricalInterpolant(object):
         domain = reduced_basis.model.domain
         self.nodes = domain[eim.indices]
 
-        # #########################################################
-        # import sys
-        # last_j = -1
-        # sorted_zipped = sorted(enumerate(eim.indices), key=lambda x: x[1])
-        # print(sorted_zipped)
-        # for i,j in sorted_zipped:
-        #     if j==last_j:
-        #         print(i,j)
-        #     last_j = j
-        # sys.exit()
-        # zipped = list(zip(self.nodes, eim.B))
-        # sorted_zipped = sorted(zipped, key=lambda x: x[0])
-        # self.nodes, self.B_matrix = zip(*sorted_zipped)
-        # #########################################################
-
-        self.nodes, self.B_matrix = zip(*sorted(zip(self.nodes, eim.B)))
+        nodes_sorted, B_matrix_sorted = zip(
+            *sorted(zip(self.nodes, eim.B), key=lambda x: x[0])
+        )
+        self.nodes = np.asarray(nodes_sorted)
+        self.B_matrix = np.asarray(B_matrix_sorted)
 
         return self
 
