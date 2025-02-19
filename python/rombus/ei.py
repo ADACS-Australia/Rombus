@@ -213,7 +213,6 @@ class _StandardEIM(_EmpiricalInterpolation):
         dim = len(basis)
         with log.progress("Iterating", dim - 1) as progress:
             for ctr in range(dim - 1):
-
                 # Single iteration
                 self.iter(ctr, basis[ctr + 1])
                 progress.update(ctr)

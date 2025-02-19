@@ -3,7 +3,6 @@ import timeit
 
 
 import h5py  # type: ignore
-import mpi4py
 import numpy as np
 
 from typing import Optional, Self, NamedTuple
@@ -33,7 +32,6 @@ class ReducedOrderModel(object):
         basename: Optional[str] = None,
         tol: float = DEFAULT_TOLERANCE,
     ):
-
         self.model: RombusModel = RombusModel.load(model)
         """Model used to generate the ROM"""
 
@@ -228,7 +226,6 @@ class ReducedOrderModel(object):
     def _validate_and_refine_basis(
         self, n_random: int, tol: float = DEFAULT_TOLERANCE, iterate: bool = True
     ) -> None:
-
         """Perform ROM refinement.
 
         Parameters
@@ -252,7 +249,7 @@ class ReducedOrderModel(object):
         else:
             n_selected_greedy_points_global = np.iinfo(np.int32).max
             n_greedy_last = len(self.reduced_basis.greedypoints)
-            n_greedy_last_global = mpi.COMM.allreduce(n_greedy_last, op=mpi4py.MPI.SUM)
+            n_greedy_last_global = mpi.allreduce_SUM(n_greedy_last)
             while True:
                 # generate validation set by randomly sampling the parameter space
                 new_samples = Samples(self.model, n_random=n_random)
@@ -273,8 +270,8 @@ class ReducedOrderModel(object):
                         proj_error = 1 - np.sum(np.dot(my_vs[i], RB_transpose) ** 2)
                     if proj_error > tol:
                         selected_greedy_points.append(validation_sample)
-                n_selected_greedy_points_global = mpi.COMM.allreduce(
-                    len(selected_greedy_points), op=mpi4py.MPI.SUM
+                n_selected_greedy_points_global = mpi.allreduce_SUM(
+                    len(selected_greedy_points)
                 )
                 log.comment(
                     f"Number of samples added: {n_selected_greedy_points_global}"
@@ -287,9 +284,7 @@ class ReducedOrderModel(object):
                     self.model, self.samples, tol=tol
                 )
                 n_greedy_new = len(self.reduced_basis.greedypoints)
-                n_greedy_new_global = mpi.COMM.allreduce(
-                    n_greedy_new, op=mpi4py.MPI.SUM
-                )
+                n_greedy_new_global = mpi.allreduce_SUM(n_greedy_new)
 
                 if not iterate or n_greedy_new_global == n_greedy_last_global:
                     break
