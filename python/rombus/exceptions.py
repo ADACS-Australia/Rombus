@@ -57,6 +57,15 @@ class RombusModelInitError(RombusException):
     pass
 
 
+# rombus.mpi exceptions
+
+
+class RombusMPIError(RombusException):
+    """Raised when there is an MPI error."""
+
+    pass
+
+
 # rombus.plots exceptions
 
 

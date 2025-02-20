@@ -26,7 +26,6 @@ def _get_highest_error(error_list, basis_indices):
 
 
 def _dot_product(weights, a, b):
-
     assert len(a) == len(b)
     return np.vdot(a * weights, b)
 
@@ -98,7 +97,6 @@ class ReducedBasis(object):
     def compute(
         self, model: RombusModelType, samples: Samples, tol: float = DEFAULT_TOLERANCE
     ) -> Self:
-
         """Compute a reduced basis for a given model and set of parameters.
 
         Parameters
@@ -124,7 +122,6 @@ class ReducedBasis(object):
         with log.progress(
             "Filling basis with greedy-algorithm", log10(tol), reverse=True
         ) as progress:
-
             # hardcoding 1st model to be used to start the basis
             self._init_matrix(my_ts[0])
             basis_indicies = [0]
@@ -206,7 +203,7 @@ class ReducedBasis(object):
         )
 
         # gather all errors (below is a list[ rank0_errors, rank1_errors...])
-        all_rank_errors = mpi.COMM.gather(projection_errors, root=mpi.MAIN_RANK)
+        all_rank_errors = mpi.gather(projection_errors, root=mpi.MAIN_RANK)
 
         # determine highest error
         if mpi.RANK_IS_MAIN:
@@ -214,7 +211,7 @@ class ReducedBasis(object):
             err_rank, err_idx, error = error_data
         else:
             error_data = None, None, None
-        error_data = mpi.COMM.bcast(
+        error_data = mpi.bcast(
             error_data, root=mpi.MAIN_RANK
         )  # share the error data with all nodes
         err_rank, err_idx, error = error_data
@@ -223,11 +220,12 @@ class ReducedBasis(object):
         worst_model = None
         if err_rank == mpi.MAIN_RANK:
             worst_model = my_ts[err_idx]  # no need to send
+        # the following should only run if mpi.SIZE>1
         elif mpi.RANK == err_rank:
             worst_model = my_ts[err_idx]
-            mpi.COMM.send(worst_model, dest=mpi.MAIN_RANK)
+            mpi.Send(worst_model, dest=mpi.MAIN_RANK)
         if worst_model is None and mpi.RANK_IS_MAIN:
-            worst_model = mpi.COMM.recv(source=err_rank)
+            worst_model = mpi.Recv(source=err_rank)
 
         # adding worst model to basis
         if mpi.RANK_IS_MAIN:
@@ -235,7 +233,7 @@ class ReducedBasis(object):
             self.matrix.append(self._IMGS(worst_model, iter))
 
         # share the basis with ALL nodes
-        matrix = mpi.COMM.bcast(self.matrix, root=mpi.MAIN_RANK)
+        matrix = mpi.bcast(self.matrix, root=mpi.MAIN_RANK)
         return matrix, pc_matrix, error_data
 
     def _IMGS(self, next_vec, iter):
@@ -264,7 +262,6 @@ class ReducedBasis(object):
         return next_vec, norm
 
     def _project_onto_basis(self, integration_weights, my_ts, iter):
-
         pc = np.zeros(len(my_ts), dtype=self.model.ordinate.dtype)
         for j in range(len(my_ts)):
             pc[j] = _dot_product(integration_weights, self.matrix[iter], my_ts[j])
@@ -282,5 +279,5 @@ class ReducedBasis(object):
         else:
             self.matrix = None
         # share the basis with ALL nodes
-        self.matrix = mpi.COMM.bcast(self.matrix, root=mpi.MAIN_RANK)
+        self.matrix = mpi.bcast(self.matrix, root=mpi.MAIN_RANK)
         self._set_matrix_shape()

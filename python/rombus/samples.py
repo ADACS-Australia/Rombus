@@ -19,7 +19,6 @@ class Samples(object):
     def __init__(
         self, model: RombusModel, filename: Optional[str] = None, n_random: int = 0
     ):
-
         self.model: RombusModel = model
         """Rombus model for which the samples are computed"""
 
@@ -177,4 +176,4 @@ class Samples(object):
             for i, chunk in enumerate(samples):
                 chunks[i % mpi.SIZE].append(chunk)
 
-        return mpi.COMM.scatter(chunks, root=mpi.MAIN_RANK)
+        return mpi.Scatter(chunks, root=mpi.MAIN_RANK)
