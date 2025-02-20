@@ -5,6 +5,10 @@ Getting started with Rombus is easy.  To install it you just need to run the fol
 ```console
 $ pip install rombus
 ```
+or if you would like support for distributed execution with MPI:
+```console
+$ pip install rombus[mpi]
+```
 Once that's done, you need just two things to build a Reduced Order Model (ROM):
 1. an ___appropriately defined Python class___ (more on that below) placed somewhere in your Python path or in your current working directory, and
 2. a ___file listing a set of parameter samples___ to be used to construct the model.
