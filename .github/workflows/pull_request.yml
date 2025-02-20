@@ -63,7 +63,7 @@ jobs:
       - name: Enforce maintainance of Poetry project
         run: |
           poetry check
-          poetry lock --check
+          poetry check --lock
 
       # Run tests
       - name: Generate build
