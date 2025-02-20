@@ -11,7 +11,7 @@ BUILDDIR      = docs/_build
 PATH_EXCLUDE_LIST = docs/content python/${PKG_PROJECT}/tests python/${PKG_PROJECT}/models python/${PKG_PROJECT}/cli.py
 
 # Set some variables needed by the documentation
-PKG_PROJECT := $(shell poetry run python3 -c 'from tomllib import load;print(load(open("pyproject.toml","rb"))["tool"]["poetry"]["name"])')
+PKG_PROJECT := $(shell poetry run python3 -c 'from tomllib import load;print(load(open("pyproject.toml","rb"))["project"]["name"])')
 PKG_AUTHOR  := $(shell poetry run python3 -c 'from importlib.metadata import metadata; print(metadata("${PKG_PROJECT}")["author"])')
 PKG_VERSION := $(word 2,$(shell poetry version))
 PKG_RELEASE := ${PKG_VERSION}
