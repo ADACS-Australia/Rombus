@@ -5,20 +5,18 @@ from click.testing import CliRunner
 
 from rombus.cli import cli
 
-import warnings
+# import warnings
 
-warnings.simplefilter("ignore", np.ComplexWarning)
+# warnings.simplefilter("ignore", np.ComplexWarning)
 
 
 @pytest.mark.lalsuite
 def test_PhenomP(tmp_path):
-
     atol = 1e-12
     rtol = 1e-12
 
     runner = CliRunner()
     with runner.isolated_filesystem(temp_dir=tmp_path):
-
         greedy_filename = str(
             importlib.resources.files("rombus.models").joinpath("PhenomP_samples.csv")
         )
