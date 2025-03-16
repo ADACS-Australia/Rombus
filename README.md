@@ -30,7 +30,7 @@ class Model(RombusModel):
         """Compute the model for a given parameter set."""
         return polyval([p.a2, p.a1, p.a0], x)
 ```
-and specify a set of points (in this case, the file `my_model_samples.py`) to build your ROM from:
+and specify a set of points (in this case, the file `my_model_samples.csv`) to build your ROM from:
 ```
 -10, -10,-10
 -10,  10,-10
