@@ -14,9 +14,10 @@ packages = [
 homepage = "https://github.com/ADACS-Australia/rombus"
 documentation = "https://rombus.readthedocs.io/en/latest/"
 dynamic = ["version"]
-requires-python=">=3.11"
+requires-python=">=3.12"
 dependencies = [
-    "scipy==1.9.3",
+    "scipy>=1.15.2",
+    "numpy>=2.2.0",
     "h5py (>=3.8.0,<4.0.0)",
     "six (>=1.16.0,<2.0.0)",
     "matplotlib (>=3.6.2,<4.0.0)",

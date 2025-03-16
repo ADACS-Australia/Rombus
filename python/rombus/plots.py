@@ -8,9 +8,9 @@ import rombus.exceptions as exceptions
 from rombus.rom import ReducedOrderModel
 from rombus._core.log import log
 
-import warnings
+# import warnings
 
-warnings.simplefilter("ignore", np.ComplexWarning)
+# warnings.simplefilter("ignore", np.ComplexWarning)
 
 
 def bases_errors(ROM: ReducedOrderModel) -> None:
@@ -96,7 +96,6 @@ def compare_rom_to_true(
                 "ROM not initialised when generating comparison plot."
             )
         else:
-
             # N.B.: mypy struggles with NamedTuples, so typing is turned off for the following
             model_params = ROM.model.sample(model_params_in)
             # model_params = ROM.model.params.params_dtype(**model_params_in)  # type: ignore

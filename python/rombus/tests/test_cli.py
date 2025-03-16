@@ -4,9 +4,9 @@ import rombus
 from os.path import isfile
 from click.testing import CliRunner
 
-import warnings
+# import warnings
 
-warnings.simplefilter("ignore", np.ComplexWarning)
+# warnings.simplefilter("ignore", np.ComplexWarning)
 
 
 def test_cli_help(tmp_path):
@@ -51,14 +51,12 @@ def test_cli_quickstart(tmp_path):
 
 
 def test_cli_end_to_end(tmp_path):
-
     atol = 1e-6
     rtol = 1e-10
 
     runner = CliRunner()
     test_model = "sinc"
     with runner.isolated_filesystem(temp_dir=tmp_path):
-
         greedy_filename = str(
             importlib.resources.files("rombus.models").joinpath(
                 f"{test_model}_samples.csv"

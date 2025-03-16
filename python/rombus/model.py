@@ -15,9 +15,9 @@ from rombus.params import Params
 from rombus._core.log import log
 from typing import NamedTuple
 
-import warnings
+# import warnings
 
-warnings.simplefilter("ignore", np.ComplexWarning)
+# warnings.simplefilter("ignore", np.ComplexWarning)
 
 # Need to put Samples in quotes below and check TYPE_CHECKING here to
 # manage circular imports with models.py
@@ -118,7 +118,6 @@ class _RombusModelMeta(type):
         return result
 
     def __new__(mcs, name, bases, dct):
-
         # Perform super-metaclass construction↵
         return super(_RombusModelMeta, mcs).__new__(mcs, name, bases, dct)
 
@@ -141,7 +140,6 @@ class RombusModel(metaclass=_RombusModelABCMeta):
     """The parameters defined for this model"""
 
     def __init__(self, model: str):
-
         # Keep track of the model string so we can reinstantiate from a saved state
         self.model_str = model
         self.basename = self.model_str.split(":")[0].split(".")[-1]
@@ -212,7 +210,6 @@ class RombusModel(metaclass=_RombusModelABCMeta):
     @classmethod
     @log.callable("Loading model from file")
     def load(cls, model: str | Self) -> Self:
-
         """Ensure that a model has been imported for use by Rombus.
 
         Parameters
@@ -396,13 +393,13 @@ class RombusModel(metaclass=_RombusModelABCMeta):
 
 RombusModelType = RombusModel | str
 
+
 # The code that follows is modified from code copied from the Uvicorn codebase:
 #     https://github.com/encode/uvicorn (commit: d613cbea388bafafb6f642077c035ed137deea61)
 # Copyright © 2017-present, [Encode OSS Ltd](https://www.encode.io/).
 # All rights reserved.
 @log.callable("Importing model")
 def _import_from_string(import_str: str) -> Any:
-
     """Import a RombusModel class from a given string of the form 'python.module.name:ClassName'.
 
     Generally, the user model will be defined in a file in the current working directory with filename (for
